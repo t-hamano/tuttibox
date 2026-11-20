@@ -1,3 +1,5 @@
+<p align="center"><img src="build/icon.png" width="128" height="128" alt="Tuttibox icon"></p>
+
 # Tuttibox
 
 A lightweight desktop app for Windows and macOS that brings your web apps into one window.
