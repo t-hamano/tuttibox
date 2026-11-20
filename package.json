@@ -2,7 +2,7 @@
   "name": "tuttibox",
   "productName": "Tuttibox",
   "version": "0.1.0",
-  "description": "Gmail・Chatwork・Google Keep・Google カレンダーを1つのウィンドウにまとめる軽量デスクトップアプリ",
+  "description": "A lightweight desktop app that brings Gmail, Chatwork, Google Calendar and Google Keep into one window",
   "main": "dist/main/main.js",
   "private": true,
   "license": "MIT",
@@ -10,8 +10,8 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
     "start": "npm run build && electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dist:mac": "npm run build && electron-builder --mac --publish never",
-    "dist:win": "npm run build && electron-builder --win --publish never"
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win"
   },
   "build": {
     "appId": "com.t-hamano.tuttibox",
@@ -25,25 +25,9 @@
     },
     "mac": {
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "universal"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "universal"
-          ]
-        }
+        "dmg"
       ],
-      "category": "public.app-category.productivity",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": true
+      "category": "public.app-category.productivity"
     },
     "win": {
       "target": [
@@ -59,12 +43,6 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "t-hamano",
-      "repo": "tuttibox",
-      "releaseType": "draft"
     }
   },
   "devDependencies": {

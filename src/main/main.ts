@@ -19,7 +19,7 @@ import { findServiceType, serviceTypes, type ServiceType } from './services';
 import { loadSettings, saveSettings, type ServiceConfig } from './settings';
 
 const SIDEBAR_WIDTH = 64;
-/** ウィンドウ上端の境界線の太さ。ビューをこの分だけ下げ、隙間にウィンドウ背景色を見せて線にする */
+/** Thickness of the top border. Views are shifted down by this amount so the window background shows through as a line */
 const TOP_BORDER = 1;
 const BORDER_COLOR = '#d9d9de';
 const isMac = process.platform === 'darwin';
@@ -28,13 +28,12 @@ interface ServiceState {
 	config: ServiceConfig;
 	type: ServiceType;
 	view: WebContentsView;
-	/** タイトルから読み取った未読数 (バッジ無効でも保持する) */
+	/** Unread count read from the title (kept even when the badge is disabled) */
 	unread: number;
 	icon?: string;
-	cssKey?: string;
 }
 
-/** サイドバーへ送る表示用データ */
+/** Display data sent to the sidebar */
 export interface SidebarItem {
 	id: string;
 	name: string;
@@ -44,17 +43,16 @@ export interface SidebarItem {
 	active: boolean;
 }
 
-/** 編集画面とやりとりするデータ */
+/** Data exchanged with the edit window */
 export interface EditData {
 	name: string;
 	badge: boolean;
-	css: string;
 	js: string;
 	typeLabel: string;
 	supportsBadge: boolean;
 }
 
-// Electron/アプリ名を含む UA だと Google ログインが拒否されるため、通常の Chrome UA にする
+// Google rejects sign-in when the UA contains Electron or the app name, so use a plain Chrome UA
 app.userAgentFallback = app.userAgentFallback
 	.replace( /\sElectron\/\S+/, '' )
 	.replace( new RegExp( `\\s${ app.getName() }/\\S+`, 'i' ), '' );
@@ -66,12 +64,14 @@ if ( ! gotLock ) {
 
 let win: BaseWindow | null = null;
 let sidebar: WebContentsView;
-/** サイドバーの表示順 */
+/** Shown in the content area while no services have been added */
+let emptyView: WebContentsView;
+/** In sidebar order */
 const states: ServiceState[] = [];
 let activeId: string | undefined;
 let quitting = false;
 const settings = loadSettings();
-/** 編集ウィンドウの webContents.id → サービス ID */
+/** Edit window webContents.id -> service ID */
 const editWindows = new Map< number, string >();
 
 function createWindow(): void {
@@ -101,6 +101,16 @@ function createWindow(): void {
 	sidebar.webContents.loadFile( join( __dirname, '../renderer/sidebar.html' ) );
 	sidebar.webContents.on( 'did-finish-load', pushSidebarState );
 
+	emptyView = new WebContentsView( {
+		webPreferences: {
+			preload: join( __dirname, '../preload/sidebar.js' ),
+			sandbox: true,
+			contextIsolation: true,
+		},
+	} );
+	win.contentView.addChildView( emptyView );
+	emptyView.webContents.loadFile( join( __dirname, '../renderer/empty.html' ) );
+
 	for ( const config of settings.services ) {
 		createServiceView( config );
 	}
@@ -110,11 +120,12 @@ function createWindow(): void {
 	if ( initial ) {
 		activate( initial.config.id );
 	}
+	updateEmptyState();
 
 	win.on( 'resize', layout );
 	win.on( 'close', ( event ) => {
 		persistWindow();
-		// macOS ではウィンドウを閉じてもアプリは常駐させる
+		// On macOS, keep the app running when the window is closed
 		if ( isMac && ! quitting ) {
 			event.preventDefault();
 			win?.hide();
@@ -152,8 +163,6 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 	const wc = view.webContents;
 
 	wc.on( 'did-finish-load', () => {
-		state.cssKey = undefined;
-		applyCss( state );
 		runCustomJs( state );
 	} );
 
@@ -176,7 +185,7 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 	} );
 
 	wc.setWindowOpenHandler( ( { url } ) => {
-		// Google ログインや同一サービス内のポップアップはアプリ内で開く
+		// Open Google sign-in and same-service popups inside the app
 		if ( isInternalUrl( url, type ) ) {
 			return { action: 'allow' };
 		}
@@ -188,30 +197,30 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		const template: MenuItemConstructorOptions[] = [];
 		if ( params.linkURL ) {
 			template.push(
-				{ label: 'リンクをブラウザで開く', click: () => openExternal( params.linkURL ) },
-				{ label: 'リンクをコピー', click: () => clipboard.writeText( params.linkURL ) },
+				{ label: 'Open Link in Browser', click: () => openExternal( params.linkURL ) },
+				{ label: 'Copy Link', click: () => clipboard.writeText( params.linkURL ) },
 				{ type: 'separator' }
 			);
 		}
 		if ( params.isEditable ) {
-			template.push( { role: 'cut', label: '切り取り' } );
+			template.push( { role: 'cut', label: 'Cut' } );
 		}
-		template.push( { role: 'copy', label: 'コピー', enabled: params.selectionText.length > 0 || params.isEditable } );
+		template.push( { role: 'copy', label: 'Copy', enabled: params.selectionText.length > 0 || params.isEditable } );
 		if ( params.isEditable ) {
-			template.push( { role: 'paste', label: '貼り付け' } );
+			template.push( { role: 'paste', label: 'Paste' } );
 		}
 		template.push(
-			{ role: 'selectAll', label: 'すべて選択' },
+			{ role: 'selectAll', label: 'Select All' },
 			{ type: 'separator' },
-			{ label: '戻る', enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
-			{ label: '再読み込み', click: () => wc.reload() }
+			{ label: 'Back', enabled: wc.navigationHistory.canGoBack(), click: () => wc.navigationHistory.goBack() },
+			{ label: 'Reload', click: () => wc.reload() }
 		);
 		Menu.buildFromTemplate( template ).popup();
 	} );
 
-	// 通信断などで読み込みに失敗したら少し待って再試行する
+	// Retry after a short delay when loading fails (e.g. offline)
 	wc.on( 'did-fail-load', ( _event, errorCode, _desc, _url, isMainFrame ) => {
-		// -3 は ERR_ABORTED (ユーザー操作によるキャンセル)
+		// -3 is ERR_ABORTED (cancelled by the user)
 		if ( isMainFrame && errorCode !== -3 ) {
 			setTimeout( () => {
 				if ( ! wc.isDestroyed() ) {
@@ -229,20 +238,6 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 
 	wc.loadURL( type.url );
 	return state;
-}
-
-async function applyCss( state: ServiceState ): Promise< void > {
-	const wc = state.view.webContents;
-	if ( wc.isDestroyed() ) {
-		return;
-	}
-	if ( state.cssKey ) {
-		await wc.removeInsertedCSS( state.cssKey ).catch( () => {} );
-		state.cssKey = undefined;
-	}
-	if ( state.config.css.trim() ) {
-		state.cssKey = await wc.insertCSS( state.config.css, { cssOrigin: 'user' } );
-	}
 }
 
 function runCustomJs( state: ServiceState ): void {
@@ -298,14 +293,20 @@ function layout(): void {
 	const { width, height } = win.getContentBounds();
 	const contentHeight = Math.max( 0, height - TOP_BORDER );
 	sidebar.setBounds( { x: 0, y: TOP_BORDER, width: SIDEBAR_WIDTH, height: contentHeight } );
+	const contentBounds = {
+		x: SIDEBAR_WIDTH,
+		y: TOP_BORDER,
+		width: Math.max( 0, width - SIDEBAR_WIDTH ),
+		height: contentHeight,
+	};
+	emptyView.setBounds( contentBounds );
 	for ( const { view } of states ) {
-		view.setBounds( {
-			x: SIDEBAR_WIDTH,
-			y: TOP_BORDER,
-			width: Math.max( 0, width - SIDEBAR_WIDTH ),
-			height: contentHeight,
-		} );
+		view.setBounds( contentBounds );
 	}
+}
+
+function updateEmptyState(): void {
+	emptyView?.setVisible( states.length === 0 );
 }
 
 function findState( id: string ): ServiceState | undefined {
@@ -330,7 +331,7 @@ function activate( id: string ): void {
 function persistServices(): void {
 	settings.services = states.map( ( state ) => state.config );
 	saveSettings( settings );
-	buildMenu();
+	updateEmptyState();
 	pushSidebarState();
 }
 
@@ -341,7 +342,6 @@ function addService( type: ServiceType ): void {
 		type: type.type,
 		name: sameType > 0 ? `${ type.label } ${ sameType + 1 }` : type.label,
 		badge: true,
-		css: '',
 		js: '',
 	};
 	createServiceView( config );
@@ -357,11 +357,11 @@ async function removeService( id: string ): Promise< void > {
 	}
 	const { response } = await dialog.showMessageBox( win, {
 		type: 'warning',
-		buttons: [ '削除', 'キャンセル' ],
+		buttons: [ 'Remove', 'Cancel' ],
 		defaultId: 1,
 		cancelId: 1,
-		message: `「${ state.config.name }」を削除しますか?`,
-		detail: 'ログイン状態や設定も削除されます。',
+		message: `Remove "${ state.config.name }"?`,
+		detail: 'Its login session and settings will also be deleted.',
 	} );
 	if ( response !== 0 ) {
 		return;
@@ -386,7 +386,7 @@ function reorderServices( ids: string[] ): void {
 	const ordered = ids
 		.map( ( id ) => findState( id ) )
 		.filter( ( state ): state is ServiceState => !! state );
-	// 受け取った ID に漏れがあれば元の順で末尾に残す
+	// Keep any services missing from the received IDs at the end, in their original order
 	for ( const state of states ) {
 		if ( ! ordered.includes( state ) ) {
 			ordered.push( state );
@@ -408,7 +408,7 @@ function openEditWindow( id: string ): void {
 		height: 640,
 		minWidth: 420,
 		minHeight: 480,
-		title: `${ state.config.name } の編集`,
+		title: `Edit ${ state.config.name }`,
 		show: false,
 		autoHideMenuBar: true,
 		webPreferences: {
@@ -461,7 +461,7 @@ function updateBadges(): void {
 	if ( isMac ) {
 		app.setBadgeCount( total );
 	}
-	// Windows のオーバーレイアイコンはサイドバー側で画像を生成して `badge:overlay` で受け取る
+	// On Windows, the sidebar draws the overlay icon and sends it via `badge:overlay`
 }
 
 ipcMain.on( 'sidebar:select', ( _event, id: string ) => activate( id ) );
@@ -483,10 +483,10 @@ ipcMain.on( 'sidebar:context-menu', ( _event, id: string ) => {
 		return;
 	}
 	Menu.buildFromTemplate( [
-		{ label: '再読み込み', click: () => state.view.webContents.reload() },
-		{ label: '編集…', click: () => openEditWindow( id ) },
+		{ label: 'Reload', click: () => state.view.webContents.reload() },
+		{ label: 'Edit…', click: () => openEditWindow( id ) },
 		{ type: 'separator' },
-		{ label: '削除…', click: () => removeService( id ) },
+		{ label: 'Remove…', click: () => removeService( id ) },
 	] ).popup();
 } );
 
@@ -499,26 +499,23 @@ ipcMain.handle( 'edit:get', ( event ): EditData | null => {
 	return {
 		name: state.config.name,
 		badge: state.config.badge,
-		css: state.config.css,
 		js: state.config.js,
 		typeLabel: state.type.label,
 		supportsBadge: !! state.type.parseBadge,
 	};
 } );
 
-ipcMain.on( 'edit:save', ( event, data: Pick< EditData, 'name' | 'badge' | 'css' | 'js' > ) => {
+ipcMain.on( 'edit:save', ( event, data: Pick< EditData, 'name' | 'badge' | 'js' > ) => {
 	const id = editWindows.get( event.sender.id );
 	const state = id ? findState( id ) : undefined;
 	if ( state ) {
 		const jsChanged = state.config.js !== data.js;
 		state.config.name = data.name.trim() || state.type.label;
 		state.config.badge = data.badge;
-		state.config.css = data.css;
 		state.config.js = data.js;
 		persistServices();
 		updateBadges();
-		applyCss( state );
-		// JS は実行済みの処理を取り消せないので、変更時はページを読み込み直す
+		// Already-executed JS cannot be undone, so reload the page when it changes
 		if ( jsChanged ) {
 			state.view.webContents.reload();
 		}
@@ -538,7 +535,7 @@ ipcMain.on( 'badge:overlay', ( _event, dataUrl: string | null, total: number ) =
 		win.setOverlayIcon( null, '' );
 		return;
 	}
-	win.setOverlayIcon( nativeImage.createFromDataURL( dataUrl ), `未読 ${ total } 件` );
+	win.setOverlayIcon( nativeImage.createFromDataURL( dataUrl ), `${ total } unread` );
 } );
 
 ipcMain.on( 'service:notification-click', ( event ) => {
@@ -565,45 +562,38 @@ function persistWindow(): void {
 }
 
 function buildMenu(): void {
-	const serviceItems: MenuItemConstructorOptions[] = states.map( ( state, index ) => ( {
-		label: state.config.name,
-		accelerator: index < 9 ? `CmdOrCtrl+${ index + 1 }` : undefined,
-		click: () => activate( state.config.id ),
-	} ) );
-
 	const activeWebContents = () => ( activeId ? findState( activeId )?.view.webContents : undefined );
 
 	const template: MenuItemConstructorOptions[] = [
 		...( isMac ? [ { role: 'appMenu' } as MenuItemConstructorOptions ] : [] ),
 		{
-			label: 'ファイル',
+			label: 'File',
 			submenu: [
 				{
-					label: 'サービスを追加',
+					label: 'Add Service',
 					submenu: serviceTypes.map( ( type ) => ( { label: type.label, click: () => addService( type ) } ) ),
 				},
 				{ type: 'separator' },
-				isMac ? { role: 'close', label: 'ウィンドウを閉じる' } : { role: 'quit', label: '終了' },
+				isMac ? { role: 'close', label: 'Close Window' } : { role: 'quit', label: 'Quit' },
 			],
 		},
-		// macOS ではこのメニューが無いと Cmd+C / Cmd+V が効かない
-		{ role: 'editMenu', label: '編集' },
+		// Without this menu, Cmd+C / Cmd+V do not work on macOS
+		{ role: 'editMenu', label: 'Edit' },
 		{
-			label: '表示',
+			label: 'View',
 			submenu: [
-				{ label: '再読み込み', accelerator: 'CmdOrCtrl+R', click: () => activeWebContents()?.reload() },
-				{ label: '戻る', accelerator: isMac ? 'Cmd+[' : 'Alt+Left', click: () => activeWebContents()?.navigationHistory.goBack() },
-				{ label: '進む', accelerator: isMac ? 'Cmd+]' : 'Alt+Right', click: () => activeWebContents()?.navigationHistory.goForward() },
+				{ label: 'Reload', click: () => activeWebContents()?.reload() },
+				{ label: 'Back', click: () => activeWebContents()?.navigationHistory.goBack() },
+				{ label: 'Forward', click: () => activeWebContents()?.navigationHistory.goForward() },
 				{ type: 'separator' },
-				{ label: '拡大', accelerator: 'CmdOrCtrl+Plus', click: () => zoom( 0.5 ) },
-				{ label: '縮小', accelerator: 'CmdOrCtrl+-', click: () => zoom( -0.5 ) },
-				{ label: '実寸', accelerator: 'CmdOrCtrl+0', click: () => activeWebContents()?.setZoomLevel( 0 ) },
+				{ label: 'Zoom In', click: () => zoom( 0.5 ) },
+				{ label: 'Zoom Out', click: () => zoom( -0.5 ) },
+				{ label: 'Actual Size', click: () => activeWebContents()?.setZoomLevel( 0 ) },
 				{ type: 'separator' },
-				{ label: '開発者ツール', accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', click: () => activeWebContents()?.toggleDevTools() },
+				{ label: 'Developer Tools', click: () => activeWebContents()?.toggleDevTools() },
 			],
 		},
-		{ label: 'サービス', submenu: serviceItems.length ? serviceItems : [ { label: '(なし)', enabled: false } ] },
-		{ role: 'windowMenu', label: 'ウィンドウ' },
+		{ role: 'windowMenu', label: 'Window' },
 	];
 	Menu.setApplicationMenu( Menu.buildFromTemplate( template ) );
 
@@ -631,7 +621,7 @@ app.whenReady().then( () => {
 		return;
 	}
 	if ( process.platform === 'win32' ) {
-		// Windows の通知に必要
+		// Required for notifications on Windows
 		app.setAppUserModelId( 'com.t-hamano.tuttibox' );
 	}
 	createWindow();

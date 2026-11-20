@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 /**
- * 各サービスのページに読み込む preload。
- * Web 通知をクリックしたとき、ウィンドウを前面に出して該当サービスへ切り替える。
+ * Preload for each service page.
+ * When a web notification is clicked, bring the window to the front and switch to that service.
  */
 contextBridge.exposeInMainWorld( '__tuttibox', {
 	notificationClicked: () => ipcRenderer.send( 'service:notification-click' ),

@@ -55,7 +55,7 @@ interface TuttiboxApi {
 			img.alt = '';
 			img.draggable = false;
 			img.src = item.icon;
-			// favicon が読めなければ頭文字に戻す
+			// Fall back to the initial letter if the favicon fails to load
 			img.addEventListener( 'error', () => img.replaceWith( letter ) );
 			button.append( img );
 		} else {
@@ -71,7 +71,7 @@ interface TuttiboxApi {
 		return button;
 	}
 
-	// ドラッグ & ドロップで並び替え
+	// Reorder by drag and drop
 	container.addEventListener( 'dragstart', ( event ) => {
 		const target = ( event.target as HTMLElement ).closest< HTMLElement >( '.service' );
 		if ( ! target ) {
@@ -114,7 +114,7 @@ interface TuttiboxApi {
 	} );
 
 	function render( items: SidebarItem[] ): void {
-		// ドラッグ中に再描画するとドラッグが途切れるので、終わるまで待つ
+		// Re-rendering while dragging cancels the drag, so wait until it ends
 		if ( dragging ) {
 			return;
 		}
@@ -127,7 +127,7 @@ interface TuttiboxApi {
 		}
 	}
 
-	/** Windows タスクバー用のオーバーレイアイコン (赤丸に数字) を描く */
+	/** Draw the Windows taskbar overlay icon (a number on a red circle) */
 	function drawOverlay( total: number ): string {
 		const size = 32;
 		const canvas = document.createElement( 'canvas' );

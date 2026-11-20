@@ -1,4 +1,4 @@
-// HTML / CSS など tsc が出力しないファイルを dist にコピーする
+// Copy files that tsc does not emit (HTML, CSS, etc.) to dist
 import { cpSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 

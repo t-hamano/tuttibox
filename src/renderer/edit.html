@@ -1,39 +1,34 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
 	<link rel="stylesheet" href="edit.css">
-	<title>サービスの編集</title>
+	<title>Edit service</title>
 </head>
 <body>
 	<form id="form">
-		<h1 id="heading">サービスの編集</h1>
+		<h1 id="heading">Edit service</h1>
 
 		<label class="field">
-			<span class="label">名前</span>
+			<span class="label">Name</span>
 			<input id="name" type="text" required>
 		</label>
 
 		<label class="check">
 			<input id="badge" type="checkbox">
-			<span>未読バッジを表示する</span>
+			<span>Show unread badge</span>
 		</label>
-		<p id="badge-note" class="note" hidden>このサービスは未読数を取得できないため、バッジは表示されません。</p>
+		<p id="badge-note" class="note" hidden>This service does not expose an unread count, so no badge is shown.</p>
 
 		<label class="field grow">
-			<span class="label">カスタム CSS</span>
-			<textarea id="css" spellcheck="false" placeholder="例: .gb_Ld { display: none !important; }"></textarea>
-		</label>
-
-		<label class="field grow">
-			<span class="label">カスタム JavaScript <small>(ページ読み込みのたびに実行。変更すると再読み込みします)</small></span>
-			<textarea id="js" spellcheck="false" placeholder="例: console.log( 'loaded' );"></textarea>
+			<span class="label">Custom JavaScript <small>(runs on every page load; the page reloads when changed)</small></span>
+			<textarea id="js" spellcheck="false" placeholder="e.g. console.log( 'loaded' );"></textarea>
 		</label>
 
 		<div class="actions">
-			<button id="cancel" type="button">キャンセル</button>
-			<button type="submit" class="primary">保存</button>
+			<button id="cancel" type="button">Cancel</button>
+			<button type="submit" class="primary">Save</button>
 		</div>
 	</form>
 	<script src="edit.js"></script>

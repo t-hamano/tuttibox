@@ -1,19 +1,19 @@
-/** 追加できるサービスの種類 */
+/** A kind of service that can be added */
 export interface ServiceType {
 	type: string;
-	/** 既定の表示名 */
+	/** Default display name */
 	label: string;
 	url: string;
-	/** アイコン取得前に表示する頭文字の背景色 */
+	/** Background color of the initial letter shown until the favicon loads */
 	color: string;
 	/**
-	 * ページタイトルから未読数を取り出す。
-	 * 未読数を出さないサービスでは省略する。
+	 * Extract the unread count from the page title.
+	 * Omit for services that do not show an unread count.
 	 */
 	parseBadge?: ( title: string ) => number;
 }
 
-/** タイトル中の最初の "(数字)" を未読数として扱う */
+/** Treat the first "(number)" in the title as the unread count */
 function countInParentheses( title: string ): number {
 	const match = title.match( /\((\d+)\)/ );
 	return match ? Number( match[ 1 ] ) : 0;
@@ -25,7 +25,7 @@ export const serviceTypes: ServiceType[] = [
 		label: 'Gmail',
 		url: 'https://mail.google.com/mail/',
 		color: '#ea4335',
-		// 例: "受信トレイ (3) - user@gmail.com - Gmail"
+		// e.g. "Inbox (3) - user@gmail.com - Gmail"
 		parseBadge: countInParentheses,
 	},
 	{
@@ -33,12 +33,12 @@ export const serviceTypes: ServiceType[] = [
 		label: 'Chatwork',
 		url: 'https://www.chatwork.com/',
 		color: '#e5332a',
-		// 例: "(3) Chatwork"
+		// e.g. "(3) Chatwork"
 		parseBadge: countInParentheses,
 	},
 	{
 		type: 'google-calendar',
-		label: 'Google カレンダー',
+		label: 'Google Calendar',
 		url: 'https://calendar.google.com/',
 		color: '#4285f4',
 	},
