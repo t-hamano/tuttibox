@@ -1,5 +1,5 @@
 // Copy files that tsc does not emit (HTML, CSS, etc.) to dist
-import { cpSync, readdirSync } from 'node:fs';
+import { cpSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const src = 'src/renderer';
@@ -9,3 +9,7 @@ for (const file of readdirSync(src)) {
 		cpSync(join(src, file), join(dest, file));
 	}
 }
+
+// Tray icon used on Windows / Linux
+mkdirSync('dist/assets', { recursive: true });
+cpSync('build/icon-win.png', 'dist/assets/tray.png');
