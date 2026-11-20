@@ -10,6 +10,7 @@ import {
 	nativeImage,
 	session,
 	shell,
+	Tray,
 	type MenuItemConstructorOptions,
 	type WebContents,
 } from 'electron';
@@ -70,6 +71,8 @@ let emptyView: WebContentsView;
 const states: ServiceState[] = [];
 let activeId: string | undefined;
 let quitting = false;
+/** Notification area icon (Windows / Linux). Kept in a variable so it is not garbage collected */
+let tray: Tray | null = null;
 const settings = loadSettings();
 /** Edit window webContents.id -> service ID */
 const editWindows = new Map< number, string >();
@@ -125,11 +128,16 @@ function createWindow(): void {
 	win.on( 'resize', layout );
 	win.on( 'close', ( event ) => {
 		persistWindow();
-		// On macOS, keep the app running when the window is closed
-		if ( isMac && ! quitting ) {
+		// Keep the app running when the window is closed. It stays in the Dock on macOS
+		// and in the notification area on Windows / Linux; quit from the menu or the tray
+		if ( ! quitting ) {
 			event.preventDefault();
 			win?.hide();
 		}
+	} );
+	// Do not block Windows shutdown / sign-out by hiding the window instead of closing it
+	win.on( 'query-session-end', () => {
+		quitting = true;
 	} );
 	win.on( 'closed', () => {
 		win = null;
@@ -436,6 +444,26 @@ function showWindow(): void {
 	win.focus();
 }
 
+function createTray(): void {
+	// macOS keeps the app in the Dock, so the tray is only needed on Windows / Linux
+	if ( isMac ) {
+		return;
+	}
+	const icon = nativeImage
+		.createFromPath( join( __dirname, '../assets/tray.png' ) )
+		.resize( { width: 16, height: 16, quality: 'best' } );
+	tray = new Tray( icon );
+	tray.setToolTip( 'Tuttibox' );
+	tray.setContextMenu(
+		Menu.buildFromTemplate( [
+			{ label: 'Show Tuttibox', click: showWindow },
+			{ type: 'separator' },
+			{ label: 'Quit', click: () => app.quit() },
+		] )
+	);
+	tray.on( 'click', showWindow );
+}
+
 function badgeOf( state: ServiceState ): number {
 	return state.config.badge ? state.unread : 0;
 }
@@ -626,4 +654,5 @@ app.whenReady().then( () => {
 	}
 	createWindow();
 	buildMenu();
+	createTray();
 } );
