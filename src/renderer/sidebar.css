@@ -1,8 +1,10 @@
 :root {
-	--bg: #1e1e1e;
-	--hover: #2c2c2c;
-	--active: #3a3a3a;
-	--accent: #ffffff;
+	--bg: #ffffff;
+	--border: #d9d9de;
+	--hover: #f0f0f3;
+	--active: #e4e4ea;
+	--accent: #1c1d2e;
+	--muted: #6b6d7a;
 	--badge: #e5332a;
 }
 
@@ -14,27 +16,35 @@ html,
 body {
 	margin: 0;
 	height: 100%;
-	background: var(--bg);
 	font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 	user-select: none;
 	overflow: hidden;
 }
 
-/* macOS の信号ボタンと重ならないよう上に余白を取る */
-body.is-mac #services {
-	padding-top: 8px;
+body {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	background: var(--bg);
+	border-right: 1px solid var(--border);
 }
 
 #services {
+	flex: 1;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	gap: 6px;
+	width: 100%;
 	padding: 10px 0;
+	overflow-y: auto;
+	scrollbar-width: none;
 }
 
-.service {
+.service,
+.add {
 	position: relative;
+	flex-shrink: 0;
 	width: 48px;
 	height: 48px;
 	padding: 0;
@@ -46,7 +56,8 @@ body.is-mac #services {
 	place-items: center;
 }
 
-.service:hover {
+.service:hover,
+.add:hover {
 	background: var(--hover);
 }
 
@@ -65,22 +76,38 @@ body.is-mac #services {
 	background: var(--accent);
 }
 
-.service:focus-visible {
+.service.is-dragging {
+	opacity: 0.4;
+}
+
+.service:focus-visible,
+.add:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 1px;
 }
 
-.icon {
-	width: 28px;
-	height: 28px;
-	border-radius: 6px;
-	object-fit: contain;
+.add {
+	margin: 8px 0 12px;
+	color: var(--muted);
 }
 
+.add:hover {
+	color: var(--accent);
+}
+
+.icon,
 .letter {
 	width: 28px;
 	height: 28px;
 	border-radius: 6px;
+	pointer-events: none;
+}
+
+.icon {
+	object-fit: contain;
+}
+
+.letter {
 	color: #fff;
 	font-size: 14px;
 	font-weight: 700;
@@ -102,4 +129,5 @@ body.is-mac #services {
 	font-weight: 700;
 	line-height: 18px;
 	text-align: center;
+	pointer-events: none;
 }

@@ -1,9 +1,8 @@
-export interface ServiceDefinition {
-	/** 内部ID。セッションのパーティション名・CSS ファイル名にも使う */
-	id: string;
-	/** サイドバーのツールチップに表示する名前 */
-	name: string;
-	/** 起動時に開く URL */
+/** 追加できるサービスの種類 */
+export interface ServiceType {
+	type: string;
+	/** 既定の表示名 */
+	label: string;
 	url: string;
 	/** アイコン取得前に表示する頭文字の背景色 */
 	color: string;
@@ -20,33 +19,37 @@ function countInParentheses( title: string ): number {
 	return match ? Number( match[ 1 ] ) : 0;
 }
 
-export const services: ServiceDefinition[] = [
+export const serviceTypes: ServiceType[] = [
 	{
-		id: 'gmail',
-		name: 'Gmail',
+		type: 'gmail',
+		label: 'Gmail',
 		url: 'https://mail.google.com/mail/',
 		color: '#ea4335',
 		// 例: "受信トレイ (3) - user@gmail.com - Gmail"
 		parseBadge: countInParentheses,
 	},
 	{
-		id: 'chatwork',
-		name: 'Chatwork',
+		type: 'chatwork',
+		label: 'Chatwork',
 		url: 'https://www.chatwork.com/',
 		color: '#e5332a',
 		// 例: "(3) Chatwork"
 		parseBadge: countInParentheses,
 	},
 	{
-		id: 'google-calendar',
-		name: 'Google カレンダー',
+		type: 'google-calendar',
+		label: 'Google カレンダー',
 		url: 'https://calendar.google.com/',
 		color: '#4285f4',
 	},
 	{
-		id: 'google-keep',
-		name: 'Google Keep',
+		type: 'google-keep',
+		label: 'Google Keep',
 		url: 'https://keep.google.com/',
 		color: '#fbbc04',
 	},
 ];
+
+export function findServiceType( type: string ): ServiceType | undefined {
+	return serviceTypes.find( ( serviceType ) => serviceType.type === type );
+}

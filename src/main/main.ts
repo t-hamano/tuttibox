@@ -1,9 +1,11 @@
 import {
 	app,
 	BaseWindow,
+	BrowserWindow,
 	Menu,
 	WebContentsView,
 	clipboard,
+	dialog,
 	ipcMain,
 	nativeImage,
 	session,
@@ -11,19 +13,25 @@ import {
 	type MenuItemConstructorOptions,
 	type WebContents,
 } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { CssInjector } from './css';
-import { services, type ServiceDefinition } from './services';
-import { loadSettings, saveSettings } from './settings';
+import { findServiceType, serviceTypes, type ServiceType } from './services';
+import { loadSettings, saveSettings, type ServiceConfig } from './settings';
 
 const SIDEBAR_WIDTH = 64;
+/** ウィンドウ上端の境界線の太さ。ビューをこの分だけ下げ、隙間にウィンドウ背景色を見せて線にする */
+const TOP_BORDER = 1;
+const BORDER_COLOR = '#d9d9de';
 const isMac = process.platform === 'darwin';
 
 interface ServiceState {
-	definition: ServiceDefinition;
+	config: ServiceConfig;
+	type: ServiceType;
 	view: WebContentsView;
-	badge: number;
+	/** タイトルから読み取った未読数 (バッジ無効でも保持する) */
+	unread: number;
 	icon?: string;
+	cssKey?: string;
 }
 
 /** サイドバーへ送る表示用データ */
@@ -34,6 +42,16 @@ export interface SidebarItem {
 	icon?: string;
 	badge: number;
 	active: boolean;
+}
+
+/** 編集画面とやりとりするデータ */
+export interface EditData {
+	name: string;
+	badge: boolean;
+	css: string;
+	js: string;
+	typeLabel: string;
+	supportsBadge: boolean;
 }
 
 // Electron/アプリ名を含む UA だと Google ログインが拒否されるため、通常の Chrome UA にする
@@ -48,11 +66,13 @@ if ( ! gotLock ) {
 
 let win: BaseWindow | null = null;
 let sidebar: WebContentsView;
-let cssInjector: CssInjector;
-const states = new Map< string, ServiceState >();
-let activeId = services[ 0 ].id;
+/** サイドバーの表示順 */
+const states: ServiceState[] = [];
+let activeId: string | undefined;
 let quitting = false;
 const settings = loadSettings();
+/** 編集ウィンドウの webContents.id → サービス ID */
+const editWindows = new Map< number, string >();
 
 function createWindow(): void {
 	win = new BaseWindow( {
@@ -64,7 +84,7 @@ function createWindow(): void {
 		minHeight: 400,
 		title: 'Tuttibox',
 		autoHideMenuBar: true,
-		backgroundColor: '#1e1e1e',
+		backgroundColor: BORDER_COLOR,
 	} );
 	if ( settings.maximized ) {
 		win.maximize();
@@ -81,15 +101,15 @@ function createWindow(): void {
 	sidebar.webContents.loadFile( join( __dirname, '../renderer/sidebar.html' ) );
 	sidebar.webContents.on( 'did-finish-load', pushSidebarState );
 
-	cssInjector = new CssInjector( services );
-	for ( const definition of services ) {
-		createServiceView( definition );
+	for ( const config of settings.services ) {
+		createServiceView( config );
 	}
 
-	if ( settings.activeServiceId && states.has( settings.activeServiceId ) ) {
-		activeId = settings.activeServiceId;
+	const initial =
+		states.find( ( state ) => state.config.id === settings.activeServiceId ) ?? states[ 0 ];
+	if ( initial ) {
+		activate( initial.config.id );
 	}
-	activate( activeId );
 
 	win.on( 'resize', layout );
 	win.on( 'close', ( event ) => {
@@ -106,8 +126,12 @@ function createWindow(): void {
 	layout();
 }
 
-function createServiceView( definition: ServiceDefinition ): void {
-	const partition = `persist:${ definition.id }`;
+function createServiceView( config: ServiceConfig ): ServiceState | undefined {
+	const type = findServiceType( config.type );
+	if ( ! type ) {
+		return undefined;
+	}
+	const partition = `persist:${ config.id }`;
 	setupSession( partition );
 
 	const view = new WebContentsView( {
@@ -122,19 +146,24 @@ function createServiceView( definition: ServiceDefinition ): void {
 	view.setVisible( false );
 	win!.contentView.addChildView( view );
 
-	const state: ServiceState = { definition, view, badge: 0 };
-	states.set( definition.id, state );
+	const state: ServiceState = { config, type, view, unread: 0 };
+	states.push( state );
 
 	const wc = view.webContents;
-	cssInjector.register( definition.id, wc );
+
+	wc.on( 'did-finish-load', () => {
+		state.cssKey = undefined;
+		applyCss( state );
+		runCustomJs( state );
+	} );
 
 	wc.on( 'page-title-updated', ( _event, title ) => {
-		if ( ! definition.parseBadge ) {
+		if ( ! type.parseBadge ) {
 			return;
 		}
-		const badge = definition.parseBadge( title );
-		if ( badge !== state.badge ) {
-			state.badge = badge;
+		const unread = type.parseBadge( title );
+		if ( unread !== state.unread ) {
+			state.unread = unread;
 			updateBadges();
 		}
 	} );
@@ -148,7 +177,7 @@ function createServiceView( definition: ServiceDefinition ): void {
 
 	wc.setWindowOpenHandler( ( { url } ) => {
 		// Google ログインや同一サービス内のポップアップはアプリ内で開く
-		if ( isInternalUrl( url, definition ) ) {
+		if ( isInternalUrl( url, type ) ) {
 			return { action: 'allow' };
 		}
 		openExternal( url );
@@ -198,7 +227,32 @@ function createServiceView( definition: ServiceDefinition ): void {
 		}
 	} );
 
-	wc.loadURL( definition.url );
+	wc.loadURL( type.url );
+	return state;
+}
+
+async function applyCss( state: ServiceState ): Promise< void > {
+	const wc = state.view.webContents;
+	if ( wc.isDestroyed() ) {
+		return;
+	}
+	if ( state.cssKey ) {
+		await wc.removeInsertedCSS( state.cssKey ).catch( () => {} );
+		state.cssKey = undefined;
+	}
+	if ( state.config.css.trim() ) {
+		state.cssKey = await wc.insertCSS( state.config.css, { cssOrigin: 'user' } );
+	}
+}
+
+function runCustomJs( state: ServiceState ): void {
+	const wc = state.view.webContents;
+	if ( wc.isDestroyed() || ! state.config.js.trim() ) {
+		return;
+	}
+	wc.executeJavaScript( state.config.js, true ).catch( ( error ) => {
+		console.error( `Custom JS failed: ${ state.config.name }`, error );
+	} );
 }
 
 const configuredPartitions = new Set< string >();
@@ -217,10 +271,10 @@ function setupSession( partition: string ): void {
 	ses.setPermissionCheckHandler( ( _wc, permission ) => allowed.has( permission ) );
 }
 
-function isInternalUrl( url: string, definition: ServiceDefinition ): boolean {
+function isInternalUrl( url: string, type: ServiceType ): boolean {
 	try {
 		const { hostname } = new URL( url );
-		const serviceHost = new URL( definition.url ).hostname;
+		const serviceHost = new URL( type.url ).hostname;
 		return (
 			url === 'about:blank' ||
 			hostname === serviceHost ||
@@ -242,30 +296,132 @@ function layout(): void {
 		return;
 	}
 	const { width, height } = win.getContentBounds();
-	sidebar.setBounds( { x: 0, y: 0, width: SIDEBAR_WIDTH, height } );
-	for ( const { view } of states.values() ) {
+	const contentHeight = Math.max( 0, height - TOP_BORDER );
+	sidebar.setBounds( { x: 0, y: TOP_BORDER, width: SIDEBAR_WIDTH, height: contentHeight } );
+	for ( const { view } of states ) {
 		view.setBounds( {
 			x: SIDEBAR_WIDTH,
-			y: 0,
+			y: TOP_BORDER,
 			width: Math.max( 0, width - SIDEBAR_WIDTH ),
-			height,
+			height: contentHeight,
 		} );
 	}
 }
 
+function findState( id: string ): ServiceState | undefined {
+	return states.find( ( state ) => state.config.id === id );
+}
+
 function activate( id: string ): void {
-	const target = states.get( id );
+	const target = findState( id );
 	if ( ! target ) {
 		return;
 	}
 	activeId = id;
-	for ( const state of states.values() ) {
+	for ( const state of states ) {
 		state.view.setVisible( state === target );
 	}
 	target.view.webContents.focus();
 	settings.activeServiceId = id;
 	saveSettings( settings );
 	pushSidebarState();
+}
+
+function persistServices(): void {
+	settings.services = states.map( ( state ) => state.config );
+	saveSettings( settings );
+	buildMenu();
+	pushSidebarState();
+}
+
+function addService( type: ServiceType ): void {
+	const sameType = states.filter( ( state ) => state.config.type === type.type ).length;
+	const config: ServiceConfig = {
+		id: `${ type.type }-${ randomUUID() }`,
+		type: type.type,
+		name: sameType > 0 ? `${ type.label } ${ sameType + 1 }` : type.label,
+		badge: true,
+		css: '',
+		js: '',
+	};
+	createServiceView( config );
+	layout();
+	persistServices();
+	activate( config.id );
+}
+
+async function removeService( id: string ): Promise< void > {
+	const state = findState( id );
+	if ( ! state || ! win ) {
+		return;
+	}
+	const { response } = await dialog.showMessageBox( win, {
+		type: 'warning',
+		buttons: [ '削除', 'キャンセル' ],
+		defaultId: 1,
+		cancelId: 1,
+		message: `「${ state.config.name }」を削除しますか?`,
+		detail: 'ログイン状態や設定も削除されます。',
+	} );
+	if ( response !== 0 ) {
+		return;
+	}
+	states.splice( states.indexOf( state ), 1 );
+	win.contentView.removeChildView( state.view );
+	const ses = state.view.webContents.session;
+	state.view.webContents.close();
+	ses.clearStorageData().catch( () => {} );
+
+	if ( activeId === id ) {
+		activeId = undefined;
+		if ( states[ 0 ] ) {
+			activate( states[ 0 ].config.id );
+		}
+	}
+	persistServices();
+	updateBadges();
+}
+
+function reorderServices( ids: string[] ): void {
+	const ordered = ids
+		.map( ( id ) => findState( id ) )
+		.filter( ( state ): state is ServiceState => !! state );
+	// 受け取った ID に漏れがあれば元の順で末尾に残す
+	for ( const state of states ) {
+		if ( ! ordered.includes( state ) ) {
+			ordered.push( state );
+		}
+	}
+	states.splice( 0, states.length, ...ordered );
+	persistServices();
+}
+
+function openEditWindow( id: string ): void {
+	const state = findState( id );
+	if ( ! state || ! win ) {
+		return;
+	}
+	const editWin = new BrowserWindow( {
+		parent: win,
+		modal: true,
+		width: 560,
+		height: 640,
+		minWidth: 420,
+		minHeight: 480,
+		title: `${ state.config.name } の編集`,
+		show: false,
+		autoHideMenuBar: true,
+		webPreferences: {
+			preload: join( __dirname, '../preload/edit.js' ),
+			sandbox: true,
+			contextIsolation: true,
+		},
+	} );
+	const wcId = editWin.webContents.id;
+	editWindows.set( wcId, id );
+	editWin.on( 'closed', () => editWindows.delete( wcId ) );
+	editWin.once( 'ready-to-show', () => editWin.show() );
+	editWin.loadFile( join( __dirname, '../renderer/edit.html' ) );
 }
 
 function showWindow(): void {
@@ -280,32 +436,28 @@ function showWindow(): void {
 	win.focus();
 }
 
+function badgeOf( state: ServiceState ): number {
+	return state.config.badge ? state.unread : 0;
+}
+
 function pushSidebarState(): void {
 	if ( ! sidebar || sidebar.webContents.isDestroyed() ) {
 		return;
 	}
-	const items: SidebarItem[] = [ ...states.values() ].map( ( state ) => ( {
-		id: state.definition.id,
-		name: state.definition.name,
-		color: state.definition.color,
+	const items: SidebarItem[] = states.map( ( state ) => ( {
+		id: state.config.id,
+		name: state.config.name,
+		color: state.type.color,
 		icon: state.icon,
-		badge: state.badge,
-		active: state.definition.id === activeId,
+		badge: badgeOf( state ),
+		active: state.config.id === activeId,
 	} ) );
 	sidebar.webContents.send( 'sidebar:state', items );
 }
 
-function totalBadge(): number {
-	let total = 0;
-	for ( const state of states.values() ) {
-		total += state.badge;
-	}
-	return total;
-}
-
 function updateBadges(): void {
 	pushSidebarState();
-	const total = totalBadge();
+	const total = states.reduce( ( sum, state ) => sum + badgeOf( state ), 0 );
 	if ( isMac ) {
 		app.setBadgeCount( total );
 	}
@@ -313,6 +465,70 @@ function updateBadges(): void {
 }
 
 ipcMain.on( 'sidebar:select', ( _event, id: string ) => activate( id ) );
+
+ipcMain.on( 'sidebar:reorder', ( _event, ids: string[] ) => reorderServices( ids ) );
+
+ipcMain.on( 'sidebar:add-menu', () => {
+	Menu.buildFromTemplate(
+		serviceTypes.map( ( type ) => ( {
+			label: type.label,
+			click: () => addService( type ),
+		} ) )
+	).popup();
+} );
+
+ipcMain.on( 'sidebar:context-menu', ( _event, id: string ) => {
+	const state = findState( id );
+	if ( ! state ) {
+		return;
+	}
+	Menu.buildFromTemplate( [
+		{ label: '再読み込み', click: () => state.view.webContents.reload() },
+		{ label: '編集…', click: () => openEditWindow( id ) },
+		{ type: 'separator' },
+		{ label: '削除…', click: () => removeService( id ) },
+	] ).popup();
+} );
+
+ipcMain.handle( 'edit:get', ( event ): EditData | null => {
+	const id = editWindows.get( event.sender.id );
+	const state = id ? findState( id ) : undefined;
+	if ( ! state ) {
+		return null;
+	}
+	return {
+		name: state.config.name,
+		badge: state.config.badge,
+		css: state.config.css,
+		js: state.config.js,
+		typeLabel: state.type.label,
+		supportsBadge: !! state.type.parseBadge,
+	};
+} );
+
+ipcMain.on( 'edit:save', ( event, data: Pick< EditData, 'name' | 'badge' | 'css' | 'js' > ) => {
+	const id = editWindows.get( event.sender.id );
+	const state = id ? findState( id ) : undefined;
+	if ( state ) {
+		const jsChanged = state.config.js !== data.js;
+		state.config.name = data.name.trim() || state.type.label;
+		state.config.badge = data.badge;
+		state.config.css = data.css;
+		state.config.js = data.js;
+		persistServices();
+		updateBadges();
+		applyCss( state );
+		// JS は実行済みの処理を取り消せないので、変更時はページを読み込み直す
+		if ( jsChanged ) {
+			state.view.webContents.reload();
+		}
+	}
+	BrowserWindow.fromWebContents( event.sender )?.close();
+} );
+
+ipcMain.on( 'edit:cancel', ( event ) => {
+	BrowserWindow.fromWebContents( event.sender )?.close();
+} );
 
 ipcMain.on( 'badge:overlay', ( _event, dataUrl: string | null, total: number ) => {
 	if ( process.platform !== 'win32' || ! win ) {
@@ -329,17 +545,12 @@ ipcMain.on( 'service:notification-click', ( event ) => {
 	const state = findStateByWebContents( event.sender );
 	showWindow();
 	if ( state ) {
-		activate( state.definition.id );
+		activate( state.config.id );
 	}
 } );
 
 function findStateByWebContents( wc: WebContents ): ServiceState | undefined {
-	for ( const state of states.values() ) {
-		if ( state.view.webContents === wc ) {
-			return state;
-		}
-	}
-	return undefined;
+	return states.find( ( state ) => state.view.webContents === wc );
 }
 
 function persistWindow(): void {
@@ -354,21 +565,23 @@ function persistWindow(): void {
 }
 
 function buildMenu(): void {
-	const serviceItems: MenuItemConstructorOptions[] = services.map( ( service, index ) => ( {
-		label: service.name,
-		accelerator: `CmdOrCtrl+${ index + 1 }`,
-		click: () => activate( service.id ),
+	const serviceItems: MenuItemConstructorOptions[] = states.map( ( state, index ) => ( {
+		label: state.config.name,
+		accelerator: index < 9 ? `CmdOrCtrl+${ index + 1 }` : undefined,
+		click: () => activate( state.config.id ),
 	} ) );
 
-	const activeWebContents = () => states.get( activeId )?.view.webContents;
+	const activeWebContents = () => ( activeId ? findState( activeId )?.view.webContents : undefined );
 
 	const template: MenuItemConstructorOptions[] = [
 		...( isMac ? [ { role: 'appMenu' } as MenuItemConstructorOptions ] : [] ),
 		{
 			label: 'ファイル',
 			submenu: [
-				{ label: 'CSS フォルダを開く', click: () => shell.openPath( cssInjector.dir ) },
-				{ label: 'CSS を再適用', click: () => cssInjector.reloadAll() },
+				{
+					label: 'サービスを追加',
+					submenu: serviceTypes.map( ( type ) => ( { label: type.label, click: () => addService( type ) } ) ),
+				},
 				{ type: 'separator' },
 				isMac ? { role: 'close', label: 'ウィンドウを閉じる' } : { role: 'quit', label: '終了' },
 			],
@@ -389,7 +602,7 @@ function buildMenu(): void {
 				{ label: '開発者ツール', accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I', click: () => activeWebContents()?.toggleDevTools() },
 			],
 		},
-		{ label: 'サービス', submenu: serviceItems },
+		{ label: 'サービス', submenu: serviceItems.length ? serviceItems : [ { label: '(なし)', enabled: false } ] },
 		{ role: 'windowMenu', label: 'ウィンドウ' },
 	];
 	Menu.setApplicationMenu( Menu.buildFromTemplate( template ) );
@@ -421,6 +634,6 @@ app.whenReady().then( () => {
 		// Windows の通知に必要
 		app.setAppUserModelId( 'com.t-hamano.tuttibox' );
 	}
-	buildMenu();
 	createWindow();
+	buildMenu();
 } );

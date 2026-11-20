@@ -5,8 +5,11 @@ Gmail・Chatwork・Google カレンダー・Google Keep を 1 つのウィンド
 ## 機能
 
 - 左のサイドバーでサービスを切り替え、右側に表示
+- 左下の「+」からサービスを追加（同じサービスを複数追加可。例: Gmail を 2 アカウント）
+- サイドバーのアイコンはドラッグ & ドロップで並び替え
+- アイコンの右クリックメニュー: 再読み込み / 編集 / 削除
+- 編集画面で、名前・未読バッジの表示有無・カスタム CSS・カスタム JavaScript を設定
 - サービスごとにログイン状態を分離して保持（`persist:<id>` セッション）
-- サービスごとの CSS 注入（保存すると即時反映）
 - 未読バッジ（サイドバー）と、合計数のバッジ（macOS: Dock、Windows: タスクバーのオーバーレイアイコン）
 - Web 通知のクリックでウィンドウを前面に出し、該当サービスへ切り替え
 
@@ -53,16 +56,14 @@ npm run dist:win
 APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=... npm run dist:mac
 ```
 
-## CSS 注入
+## カスタム CSS / JavaScript
 
-メニュー「ファイル → CSS フォルダを開く」で開くフォルダに、サービスごとの CSS ファイルがあります。
+サイドバーのアイコンを右クリック →「編集…」で設定します。
 
-| サービス | ファイル |
-|---|---|
-| Gmail | `gmail.css` |
-| Chatwork | `chatwork.css` |
-| Google カレンダー | `google-calendar.css` |
-| Google Keep | `google-keep.css` |
+- CSS: 保存するとすぐ反映され、ページを読み込むたびに注入されます
+- JavaScript: ページを読み込むたびに実行されます。変更して保存するとページを再読み込みします
+
+設定は `settings.json`（macOS: `~/Library/Application Support/Tuttibox/`、Windows: `%APPDATA%\Tuttibox\`）に保存されます。
 
 ## 未読バッジ
 
@@ -72,7 +73,7 @@ APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=... npm run dist:mac
 
 | 操作 | macOS | Windows |
 |---|---|---|
-| サービス切り替え | `Cmd+1`〜`Cmd+4` | `Ctrl+1`〜`Ctrl+4` |
+| サービス切り替え（上から 9 個まで） | `Cmd+1`〜`Cmd+9` | `Ctrl+1`〜`Ctrl+9` |
 | 再読み込み | `Cmd+R` | `Ctrl+R` |
 | 戻る / 進む | `Cmd+[` / `Cmd+]` | `Alt+←` / `Alt+→` |
 | 拡大 / 縮小 / 実寸 | `Cmd+Plus` / `Cmd+-` / `Cmd+0` | `Ctrl+Plus` / `Ctrl+-` / `Ctrl+0` |
@@ -83,13 +84,14 @@ APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=... npm run dist:mac
 ```
 src/
   main/
-    main.ts       ウィンドウ・ビュー管理、バッジ集計、メニュー
-    services.ts   サービス定義（URL・バッジの読み取り方法）
-    css.ts        CSS 注入とファイル監視
-    settings.ts   ウィンドウ位置・最後に開いたサービスの保存
+    main.ts       ウィンドウ・ビュー管理、サービスの追加/削除/並び替え、バッジ集計、メニュー
+    services.ts   追加できるサービスの種類（URL・バッジの読み取り方法）
+    settings.ts   サービス一覧・ウィンドウ位置などの保存
   preload/
     sidebar.ts    サイドバー用 API
     service.ts    Web 通知クリックの検知
+    edit.ts       編集画面用 API
   renderer/
     sidebar.*     サイドバー UI
+    edit.*        サービスの編集画面
 ```
