@@ -1,17 +1,28 @@
 # Tuttibox
 
-A lightweight desktop app for Windows and macOS that brings Gmail, Chatwork, Google Calendar and Google Keep into one window.
+A lightweight desktop app for Windows and macOS that brings your web apps into one window.
 
 ## Features
 
 - Switch services from the sidebar on the left; the selected service is shown on the right
-- Add services from the "+" button at the bottom left (the same service can be added more than once, e.g. two Gmail accounts)
+- Add services from the "+" button at the bottom left (the same service can be added more than once, e.g. for multiple accounts)
 - Reorder sidebar icons by drag and drop
 - Context menu on sidebar icons: Reload / Edit / Remove
 - Edit window for the name, unread badge on/off and custom JavaScript
 - Separate, persistent login session for each service (`persist:<id>` partition)
 - Unread badges in the sidebar, plus the total on the Dock (macOS) or as a taskbar overlay icon (Windows)
 - Clicking a web notification brings the window to the front and switches to that service
+
+## Supported apps
+
+| App | Unread badge |
+|---|---|
+| Gmail | Yes |
+| Chatwork | Yes |
+| Google Calendar | No |
+| Google Keep | No |
+
+Apps are defined in `src/main/services.ts`.
 
 ## Development
 
@@ -46,7 +57,7 @@ Settings are stored in `settings.json` (macOS: `~/Library/Application Support/Tu
 
 ## Unread badges
 
-The unread count is read from a `(number)` in the page title (Gmail, Chatwork). Google Calendar and Google Keep do not show an unread count in their titles, so they have no badge.
+The unread count is read from a `(number)` in the page title. Apps that do not show an unread count in their title have no badge (see [Supported apps](#supported-apps)).
 
 ## Project structure
 
