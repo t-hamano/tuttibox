@@ -29,6 +29,30 @@ npm run dist:win
 
 成果物は `release/` に出力されます。各 OS のビルドはその OS 上で実行してください。
 
+## リリース（署名・公証）
+
+`v1.2.3` 形式のタグを push すると、GitHub Actions（`.github/workflows/release.yml`）が macOS / Windows 版をビルドし、ドラフトリリースにアップロードします。
+
+- macOS: Developer ID Application で署名し、Apple の公証（notarization）を行う。Universal（Intel / Apple Silicon 両対応）
+- Windows: 未署名（x64 / arm64）
+
+必要なリポジトリシークレット（MarkBricks と同じ名前）:
+
+| シークレット | 内容 |
+|---|---|
+| `APPLE_CERTIFICATE` | Developer ID Application 証明書（.p12）を base64 化した文字列 |
+| `APPLE_CERTIFICATE_PASSWORD` | .p12 のパスワード |
+| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: 名前 (TEAMID)` |
+| `APPLE_ID` | Apple ID のメールアドレス |
+| `APPLE_PASSWORD` | Apple ID の App 用パスワード |
+| `APPLE_TEAM_ID` | チーム ID |
+
+ローカルの Mac で署名付きビルドを作る場合は、キーチェーンに証明書が入った状態で次を実行します。
+
+```bash
+APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=... npm run dist:mac
+```
+
 ## CSS 注入
 
 メニュー「ファイル → CSS フォルダを開く」で開くフォルダに、サービスごとの CSS ファイルがあります。
