@@ -1,0 +1,48 @@
+{
+  "name": "tuttibox",
+  "productName": "Tuttibox",
+  "version": "0.1.0",
+  "description": "Gmail・Chatwork・Google Keep・Google カレンダーを1つのウィンドウにまとめる軽量デスクトップアプリ",
+  "main": "dist/main/main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win"
+  },
+  "build": {
+    "appId": "com.t-hamano.tuttibox",
+    "productName": "Tuttibox",
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "typescript": "^5.9.3"
+  }
+}
