@@ -53,10 +53,26 @@ export interface EditData {
 	supportsBadge: boolean;
 }
 
-// Google rejects sign-in when the UA contains Electron or the app name, so use a plain Chrome UA
+// Some sites reject the UA when it contains Electron or the app name, so use a plain Chrome UA
 app.userAgentFallback = app.userAgentFallback
 	.replace( /\sElectron\/\S+/, '' )
 	.replace( new RegExp( `\\s${ app.getName() }/\\S+`, 'i' ), '' );
+
+/**
+ * Google sign-in blocks embedded Chromium even with a plain Chrome UA
+ * ("This browser or app may not be secure"), but accepts Firefox.
+ * So only on the sign-in host, present the app as Firefox.
+ */
+const SIGN_IN_HOST = 'accounts.google.com';
+const SIGN_IN_USER_AGENT = ( () => {
+	const os =
+		process.platform === 'darwin'
+			? 'Macintosh; Intel Mac OS X 10.15'
+			: process.platform === 'win32'
+			? 'Windows NT 10.0; Win64; x64'
+			: 'X11; Linux x86_64';
+	return `Mozilla/5.0 (${ os }; rv:140.0) Gecko/20100101 Firefox/140.0`;
+} )();
 
 const gotLock = app.requestSingleInstanceLock();
 if ( ! gotLock ) {
@@ -157,6 +173,8 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		webPreferences: {
 			partition,
 			preload: join( __dirname, '../preload/service.js' ),
+			// Read by the preload to present the page as Firefox on the sign-in host
+			additionalArguments: [ `--tuttibox-sign-in-ua=${ SIGN_IN_USER_AGENT }` ],
 			sandbox: true,
 			contextIsolation: true,
 			spellcheck: false,
@@ -185,7 +203,12 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		}
 	} );
 
+	const serviceHost = new URL( type.url ).hostname;
 	wc.on( 'page-favicon-updated', ( _event, favicons ) => {
+		// Ignore icons of other pages such as the sign-in page (Google's logo instead of Gmail's)
+		if ( hostnameOf( wc.getURL() ) !== serviceHost ) {
+			return;
+		}
 		if ( favicons[ 0 ] && favicons[ 0 ] !== state.icon ) {
 			state.icon = favicons[ 0 ];
 			pushSidebarState();
@@ -272,6 +295,28 @@ function setupSession( partition: string ): void {
 		callback( allowed.has( permission ) );
 	} );
 	ses.setPermissionCheckHandler( ( _wc, permission ) => allowed.has( permission ) );
+
+	// Match the request headers to the Firefox UA the sign-in page sees (Firefox sends no client hints)
+	ses.webRequest.onBeforeSendHeaders( { urls: [ `https://${ SIGN_IN_HOST }/*` ] }, ( details, callback ) => {
+		const requestHeaders: Record< string, string > = {};
+		for ( const [ key, value ] of Object.entries( details.requestHeaders ) ) {
+			const lower = key.toLowerCase();
+			if ( lower === 'user-agent' || lower.startsWith( 'sec-ch-ua' ) ) {
+				continue;
+			}
+			requestHeaders[ key ] = value;
+		}
+		requestHeaders[ 'User-Agent' ] = SIGN_IN_USER_AGENT;
+		callback( { requestHeaders } );
+	} );
+}
+
+function hostnameOf( url: string ): string | undefined {
+	try {
+		return new URL( url ).hostname;
+	} catch {
+		return undefined;
+	}
 }
 
 function isInternalUrl( url: string, type: ServiceType ): boolean {
@@ -281,7 +326,7 @@ function isInternalUrl( url: string, type: ServiceType ): boolean {
 		return (
 			url === 'about:blank' ||
 			hostname === serviceHost ||
-			hostname === 'accounts.google.com'
+			hostname === SIGN_IN_HOST
 		);
 	} catch {
 		return false;
