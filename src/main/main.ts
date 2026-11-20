@@ -452,43 +452,25 @@ async function importServices(): Promise< void > {
 	// Login sessions are not exported, so each imported app needs signing in again
 	details.push( 'You will need to sign in to each imported app.' );
 
-	let replace = false;
 	if ( states.length > 0 ) {
-		const { response } = await dialog.showMessageBox( win, {
-			type: 'question',
-			buttons: [ 'Add to Current Apps', 'Replace Current Apps', 'Cancel' ],
-			defaultId: 0,
-			cancelId: 2,
-			message: 'Import apps from this file?',
-			detail: [
-				...details,
-				'"Replace Current Apps" removes your current apps along with their login sessions.',
-			].join( '\n\n' ),
-		} );
-		if ( response === 2 ) {
-			return;
-		}
-		replace = response === 1;
-	} else {
-		const { response } = await dialog.showMessageBox( win, {
-			type: 'question',
-			buttons: [ 'Import', 'Cancel' ],
-			defaultId: 0,
-			cancelId: 1,
-			message: 'Import apps from this file?',
-			detail: details.join( '\n\n' ),
-		} );
-		if ( response !== 0 ) {
-			return;
-		}
+		details.push( 'Your current apps will be replaced and their login sessions deleted.' );
+	}
+	const { response } = await dialog.showMessageBox( win, {
+		type: 'question',
+		buttons: [ 'Import', 'Cancel' ],
+		defaultId: 0,
+		cancelId: 1,
+		message: 'Import apps from this file?',
+		detail: details.join( '\n\n' ),
+	} );
+	if ( response !== 0 ) {
+		return;
 	}
 
-	if ( replace ) {
-		for ( const state of [ ...states ] ) {
-			destroyService( state );
-		}
-		activeId = undefined;
+	for ( const state of [ ...states ] ) {
+		destroyService( state );
 	}
+	activeId = undefined;
 	for ( const config of imported ) {
 		createServiceView( config );
 	}
