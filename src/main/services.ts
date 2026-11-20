@@ -11,6 +11,11 @@ export interface ServiceType {
 	 * Omit for services that do not show an unread count.
 	 */
 	parseBadge?: ( title: string ) => number;
+	/**
+	 * Whether the service's own favicon already shows the unread count.
+	 * If so, the sidebar does not draw its own badge on top of it.
+	 */
+	faviconShowsCount?: boolean;
 }
 
 /** Treat the first "(number)" in the title as the unread count */
@@ -27,6 +32,8 @@ export const serviceTypes: ServiceType[] = [
 		color: '#ea4335',
 		// e.g. "Inbox (3) - user@gmail.com - Gmail"
 		parseBadge: countInParentheses,
+		// Gmail draws the unread count into its favicon
+		faviconShowsCount: true,
 	},
 	{
 		type: 'chatwork',

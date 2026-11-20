@@ -41,6 +41,8 @@ export interface SidebarItem {
 	color: string;
 	icon?: string;
 	badge: number;
+	/** Do not draw the badge on the icon (still counted in the taskbar/Dock total) */
+	hideBadge: boolean;
 	active: boolean;
 }
 
@@ -523,6 +525,7 @@ function pushSidebarState(): void {
 		color: state.type.color,
 		icon: state.icon,
 		badge: badgeOf( state ),
+		hideBadge: !! state.type.faviconShowsCount && !! state.icon,
 		active: state.config.id === activeId,
 	} ) );
 	sidebar.webContents.send( 'sidebar:state', items );
