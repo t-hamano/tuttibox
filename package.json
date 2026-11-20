@@ -27,7 +27,8 @@
       "target": [
         "dmg"
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png"
     },
     "win": {
       "target": [
@@ -38,7 +39,8 @@
             "arm64"
           ]
         }
-      ]
+      ],
+      "icon": "build/icon-win.png"
     },
     "nsis": {
       "oneClick": false,

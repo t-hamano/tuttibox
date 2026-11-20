@@ -32,6 +32,10 @@ npm run dist:win
 
 Output goes to `release/`. Build each platform on that platform.
 
+## App icon
+
+The source is `build/icon.svg` (macOS, with the standard padding) and `build/icon-win.svg` (Windows, full bleed). `build/icon.png` and `build/icon-win.png` are 1024px exports used by electron-builder.
+
 ## Custom JavaScript
 
 Right-click a sidebar icon and choose "Edit…".
