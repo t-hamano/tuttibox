@@ -66,7 +66,6 @@ Required repository secrets:
 |---|---|
 | `APPLE_CERTIFICATE` | Developer ID Application certificate (.p12), base64 encoded |
 | `APPLE_CERTIFICATE_PASSWORD` | Password of the .p12 |
-| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: Name (TEAMID)` |
 | `APPLE_ID` | Apple ID email address |
 | `APPLE_PASSWORD` | App-specific password for the Apple ID |
 | `APPLE_TEAM_ID` | Team ID |
