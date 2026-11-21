@@ -20,6 +20,8 @@ A lightweight desktop app for Windows and macOS that brings your web apps into o
 
 ## Supported apps
 
+Tuttibox was built for personal use, so only a small number of apps are supported. If you use Tuttibox and would like another app to be added, please [open an issue](https://github.com/t-hamano/tuttibox/issues/new) with your request.
+
 | App | Unread badge |
 |---|---|
 | Gmail | Yes |
