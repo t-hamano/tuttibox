@@ -15,6 +15,7 @@ A lightweight desktop app for Windows and macOS that brings your web apps into o
 - Unread badges in the sidebar, plus the total on the Dock (macOS) or as a taskbar overlay icon (Windows)
 - Clicking a web notification brings the window to the front and switches to that service
 - Export / import the added apps, their settings and their order from the File menu (login sessions are not included)
+- Settings window (gear button under the add button, or File > Settings…) with a "Launch at login" toggle (macOS / Windows)
 
 ## Supported apps
 

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld( 'tuttibox', {
 	select: ( id: string ) => ipcRenderer.send( 'sidebar:select', id ),
 	reorder: ( ids: string[] ) => ipcRenderer.send( 'sidebar:reorder', ids ),
 	showAddMenu: () => ipcRenderer.send( 'sidebar:add-menu' ),
+	openSettings: () => ipcRenderer.send( 'sidebar:open-settings' ),
 	showContextMenu: ( id: string ) => ipcRenderer.send( 'sidebar:context-menu', id ),
 	setOverlay: ( dataUrl: string | null, total: number ) =>
 		ipcRenderer.send( 'badge:overlay', dataUrl, total ),
