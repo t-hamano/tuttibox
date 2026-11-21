@@ -345,7 +345,8 @@ function setupSession( partition: string ): void {
 	configuredPartitions.add( partition );
 	const ses = session.fromPartition( partition );
 	ses.setUserAgent( app.userAgentFallback );
-	const allowed = new Set( [ 'notifications', 'clipboard-read', 'clipboard-sanitized-write', 'fullscreen' ] );
+	// Notifications are denied: unread counts are shown as badges instead (see preload/service.ts)
+	const allowed = new Set( [ 'clipboard-read', 'clipboard-sanitized-write', 'fullscreen' ] );
 	ses.setPermissionRequestHandler( ( _wc, permission, callback ) => {
 		callback( allowed.has( permission ) );
 	} );
@@ -882,18 +883,6 @@ ipcMain.on( 'badge:overlay', ( _event, dataUrl: string | null, total: number ) =
 	win.setOverlayIcon( nativeImage.createFromDataURL( dataUrl ), `${ total } unread` );
 } );
 
-ipcMain.on( 'service:notification-click', ( event ) => {
-	const state = findStateByWebContents( event.sender );
-	showWindow();
-	if ( state ) {
-		activate( state.config.id );
-	}
-} );
-
-function findStateByWebContents( wc: WebContents ): ServiceState | undefined {
-	return states.find( ( state ) => state.view.webContents === wc );
-}
-
 function persistWindow(): void {
 	if ( ! win ) {
 		return;
@@ -1001,8 +990,10 @@ app.whenReady().then( () => {
 		return;
 	}
 	if ( process.platform === 'win32' ) {
-		// Required for notifications on Windows
-		app.setAppUserModelId( 'com.t-hamano.tuttibox' );
+		// Must match the appId so the taskbar groups the window with the installed shortcut.
+		// Use a separate ID in development: otherwise a Start Menu shortcut to electron.exe
+		// with the release ID can be created, and the taskbar then shows the Electron icon for the release app.
+		app.setAppUserModelId( app.isPackaged ? 'com.t-hamano.tuttibox' : 'com.t-hamano.tuttibox.dev' );
 	}
 	createWindow();
 	buildMenu();
