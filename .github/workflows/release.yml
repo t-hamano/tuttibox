@@ -7,7 +7,41 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+-*'
 
 jobs:
+  # Create the draft release once, before the builds start. Otherwise
+  # electron-builder uploads files in parallel and each upload creates
+  # its own draft when none exists yet.
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check that the tag matches the app version
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      - name: Create a draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists"
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
+              --title "${GITHUB_REF_NAME#v}" --generate-notes
+          fi
+
   release:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -25,15 +59,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Check that the tag matches the app version
-        shell: bash
-        run: |
-          version="$(node -p "require('./package.json').version")"
-          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
-          fi
 
       - name: Verify macOS signing configuration
         if: matrix.platform == 'macos-latest'
