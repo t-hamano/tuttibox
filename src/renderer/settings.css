@@ -1,0 +1,129 @@
+:root {
+	--text: #1c1d2e;
+	--muted: #6b6d7a;
+	--border: #d9d9de;
+	--primary: #1c1d2e;
+	--off: #c4c5cc;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	background: #fff;
+	color: var(--text);
+	font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+	font-size: 14px;
+	user-select: none;
+}
+
+main {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+	height: 100%;
+	padding: 20px;
+}
+
+h1 {
+	margin: 0;
+	font-size: 17px;
+}
+
+.row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 12px 0;
+	border-top: 1px solid var(--border);
+	border-bottom: 1px solid var(--border);
+	cursor: pointer;
+}
+
+.text {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.label {
+	font-weight: 600;
+}
+
+.note {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.toggle {
+	appearance: none;
+	flex-shrink: 0;
+	position: relative;
+	width: 36px;
+	height: 20px;
+	margin: 0;
+	border-radius: 10px;
+	background: var(--off);
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.toggle::before {
+	content: "";
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #fff;
+	transition: transform 0.15s;
+}
+
+.toggle:checked {
+	background: var(--primary);
+}
+
+.toggle:checked::before {
+	transform: translateX(16px);
+}
+
+.toggle:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
+
+.toggle:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.row:has(.toggle:disabled) {
+	cursor: default;
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: auto;
+}
+
+button {
+	padding: 7px 16px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: #fff;
+	font: inherit;
+	cursor: pointer;
+}
+
+button.primary {
+	border-color: var(--primary);
+	background: var(--primary);
+	color: #fff;
+}

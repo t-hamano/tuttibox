@@ -1,0 +1,145 @@
+:root {
+	--bg: #ffffff;
+	--border: #d9d9de;
+	--hover: #f0f0f3;
+	--active: #e4e4ea;
+	--accent: #1c1d2e;
+	--muted: #6b6d7a;
+	--badge: #e5332a;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+	user-select: none;
+	overflow: hidden;
+}
+
+body {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	background: var(--bg);
+	border-right: 1px solid var(--border);
+}
+
+#services {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	padding: 10px 0;
+	overflow-y: auto;
+	scrollbar-width: none;
+}
+
+.service,
+.add,
+.settings {
+	position: relative;
+	flex-shrink: 0;
+	width: 48px;
+	height: 48px;
+	padding: 0;
+	border: 0;
+	border-radius: 12px;
+	background: transparent;
+	cursor: pointer;
+	display: grid;
+	place-items: center;
+}
+
+.service:hover,
+.add:hover,
+.settings:hover {
+	background: var(--hover);
+}
+
+.service.is-active {
+	background: var(--active);
+}
+
+.service.is-active::before {
+	content: "";
+	position: absolute;
+	left: -8px;
+	top: 12px;
+	width: 3px;
+	height: 24px;
+	border-radius: 0 3px 3px 0;
+	background: var(--accent);
+}
+
+.service.is-dragging {
+	opacity: 0.4;
+}
+
+.service:focus-visible,
+.add:focus-visible,
+.settings:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+.add {
+	margin: 8px 0 4px;
+}
+
+.settings {
+	margin: 0 0 12px;
+}
+
+.add,
+.settings {
+	color: var(--muted);
+}
+
+.add:hover,
+.settings:hover {
+	color: var(--accent);
+}
+
+.icon,
+.letter {
+	width: 28px;
+	height: 28px;
+	border-radius: 6px;
+	pointer-events: none;
+}
+
+.icon {
+	object-fit: contain;
+}
+
+.letter {
+	color: #fff;
+	font-size: 14px;
+	font-weight: 700;
+	display: grid;
+	place-items: center;
+}
+
+.badge {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: 9px;
+	background: var(--badge);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 18px;
+	text-align: center;
+	pointer-events: none;
+}

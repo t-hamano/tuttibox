@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+	<link rel="stylesheet" href="edit.css">
+	<title>Edit service</title>
+</head>
+<body>
+	<form id="form">
+		<h1 id="heading">Edit service</h1>
+
+		<label class="field">
+			<span class="label">Name</span>
+			<input id="name" type="text" required>
+		</label>
+
+		<label class="check">
+			<input id="badge" type="checkbox">
+			<span>Show unread badge</span>
+		</label>
+		<p id="badge-note" class="note" hidden>This service does not expose an unread count, so no badge is shown.</p>
+
+		<label class="inline">
+			<span class="label">Check for unread items</span>
+			<select id="poll-interval"></select>
+		</label>
+
+		<div class="field grow">
+			<span class="label">Custom JavaScript <small>(runs on every page load; the page reloads when changed)</small></span>
+			<textarea id="js" spellcheck="false" placeholder="e.g. console.log( 'loaded' );"></textarea>
+		</div>
+
+		<div class="actions">
+			<button id="cancel" type="button">Cancel</button>
+			<button type="submit" class="primary">Save</button>
+		</div>
+	</form>
+	<script src="code-editor.js"></script>
+	<script src="edit.js"></script>
+</body>
+</html>
