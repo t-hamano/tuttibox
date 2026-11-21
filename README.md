@@ -1,4 +1,4 @@
-<p align="center"><img src="build/icon.png" width="128" height="128" alt="Tuttibox icon"></p>
+<p align="center"><img src="docs/hero.png" alt="Tuttibox"></p>
 
 # Tuttibox
 
