@@ -15,9 +15,11 @@ import {
 	type WebContents,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { findServiceType, serviceTypes, type ServiceType } from './services';
 import { loadSettings, saveSettings, type ServiceConfig } from './settings';
+import { parseServices, serializeServices } from './transfer';
 
 const SIDEBAR_WIDTH = 64;
 /** Thickness of the top border. Views are shifted down by this amount so the window background shows through as a line */
@@ -419,11 +421,7 @@ async function removeService( id: string ): Promise< void > {
 	if ( response !== 0 ) {
 		return;
 	}
-	states.splice( states.indexOf( state ), 1 );
-	win.contentView.removeChildView( state.view );
-	const ses = state.view.webContents.session;
-	state.view.webContents.close();
-	ses.clearStorageData().catch( () => {} );
+	destroyService( state );
 
 	if ( activeId === id ) {
 		activeId = undefined;
@@ -432,6 +430,98 @@ async function removeService( id: string ): Promise< void > {
 		}
 	}
 	persistServices();
+	updateBadges();
+}
+
+/** Remove a service's view and delete its login session */
+function destroyService( state: ServiceState ): void {
+	states.splice( states.indexOf( state ), 1 );
+	win?.contentView.removeChildView( state.view );
+	const ses = state.view.webContents.session;
+	state.view.webContents.close();
+	ses.clearStorageData().catch( () => {} );
+}
+
+async function exportServices(): Promise< void > {
+	if ( ! win ) {
+		return;
+	}
+	const { canceled, filePath } = await dialog.showSaveDialog( win, {
+		title: 'Export Settings',
+		defaultPath: join( app.getPath( 'documents' ), 'tuttibox-settings.json' ),
+		filters: [ { name: 'Tuttibox Settings', extensions: [ 'json' ] } ],
+	} );
+	if ( canceled || ! filePath ) {
+		return;
+	}
+	try {
+		await writeFile( filePath, serializeServices( states.map( ( state ) => state.config ) ) );
+	} catch ( error ) {
+		dialog.showErrorBox( 'Export Failed', String( error ) );
+	}
+}
+
+async function importServices(): Promise< void > {
+	if ( ! win ) {
+		return;
+	}
+	const { canceled, filePaths } = await dialog.showOpenDialog( win, {
+		title: 'Import Settings',
+		properties: [ 'openFile' ],
+		filters: [ { name: 'Tuttibox Settings', extensions: [ 'json' ] } ],
+	} );
+	if ( canceled || ! filePaths[ 0 ] ) {
+		return;
+	}
+
+	let imported: ServiceConfig[];
+	let skipped: number;
+	try {
+		( { services: imported, skipped } = parseServices( await readFile( filePaths[ 0 ], 'utf8' ) ) );
+	} catch ( error ) {
+		dialog.showErrorBox( 'Import Failed', error instanceof Error ? error.message : String( error ) );
+		return;
+	}
+	if ( imported.length === 0 ) {
+		dialog.showErrorBox( 'Import Failed', 'The file contains no supported apps.' );
+		return;
+	}
+
+	const details = [ `${ imported.length } app(s): ${ imported.map( ( config ) => config.name ).join( ', ' ) }` ];
+	if ( skipped > 0 ) {
+		details.push( `${ skipped } unsupported app(s) will be skipped.` );
+	}
+	if ( imported.some( ( config ) => config.js.trim() ) ) {
+		details.push( 'Some apps include custom JavaScript. Only import files you trust.' );
+	}
+	// Login sessions are not exported, so each imported app needs signing in again
+	details.push( 'You will need to sign in to each imported app.' );
+
+	if ( states.length > 0 ) {
+		details.push( 'Your current apps will be replaced and their login sessions deleted.' );
+	}
+	const { response } = await dialog.showMessageBox( win, {
+		type: 'question',
+		buttons: [ 'Import', 'Cancel' ],
+		defaultId: 0,
+		cancelId: 1,
+		message: 'Import apps from this file?',
+		detail: details.join( '\n\n' ),
+	} );
+	if ( response !== 0 ) {
+		return;
+	}
+
+	for ( const state of [ ...states ] ) {
+		destroyService( state );
+	}
+	activeId = undefined;
+	for ( const config of imported ) {
+		createServiceView( config );
+	}
+	layout();
+	persistServices();
+	activate( imported[ 0 ].id );
 	updateBadges();
 }
 
@@ -646,6 +736,9 @@ function buildMenu(): void {
 					label: 'Add Service',
 					submenu: serviceTypes.map( ( type ) => ( { label: type.label, click: () => addService( type ) } ) ),
 				},
+				{ type: 'separator' },
+				{ label: 'Import Settings…', click: () => importServices() },
+				{ label: 'Export Settings…', click: () => exportServices() },
 				{ type: 'separator' },
 				isMac ? { role: 'close', label: 'Close Window' } : { role: 'quit', label: 'Quit' },
 			],

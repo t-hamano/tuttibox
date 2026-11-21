@@ -14,6 +14,7 @@ A lightweight desktop app for Windows and macOS that brings your web apps into o
 - Separate, persistent login session for each service (`persist:<id>` partition)
 - Unread badges in the sidebar, plus the total on the Dock (macOS) or as a taskbar overlay icon (Windows)
 - Clicking a web notification brings the window to the front and switches to that service
+- Export / import the added apps, their settings and their order from the File menu (login sessions are not included)
 
 ## Supported apps
 
@@ -69,6 +70,7 @@ src/
     main.ts       Window and view management, adding/removing/reordering services, badges, menus
     services.ts   Service types that can be added (URL, how to read the unread count)
     settings.ts   Persists the service list, window position, etc.
+    transfer.ts   Reads and writes the export file for File > Import / Export Settings
   preload/
     sidebar.ts    API for the sidebar
     service.ts    Detects web notification clicks
