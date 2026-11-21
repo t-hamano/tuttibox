@@ -10,8 +10,8 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
     "start": "npm run build && electron .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never"
   },
   "build": {
     "appId": "com.t-hamano.tuttibox",
@@ -25,10 +25,26 @@
     },
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "category": "public.app-category.productivity",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true
     },
     "win": {
       "target": [
@@ -45,6 +61,12 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "t-hamano",
+      "repo": "tuttibox",
+      "releaseType": "draft"
     }
   },
   "devDependencies": {
@@ -52,5 +74,8 @@
     "electron": "^45.4.1",
     "electron-builder": "^26.18.0",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }
