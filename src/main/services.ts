@@ -17,6 +17,11 @@ export interface ServiceType {
 	 */
 	pollScript?: string;
 	/**
+	 * Check interval in seconds for newly added services of this type.
+	 * Set this when the count can change without the page title changing.
+	 */
+	defaultPollInterval?: number;
+	/**
 	 * Fixed icon URL to use instead of the page's favicon.
 	 * Set this when the service draws the unread count into its favicon,
 	 * so the count is not shown twice next to the sidebar badge.
@@ -29,6 +34,21 @@ function countInParentheses( title: string ): number {
 	const match = title.match( /\((\d+)\)/ );
 	return match ? Number( match[ 1 ] ) : 0;
 }
+
+/**
+ * Read Slack's mention and DM count from the page, as Slack shows it only there.
+ * Prefers the badge on the Activity button, which is Slack's own total.
+ * Falls back to adding up the badges on the channels and DMs in the sidebar.
+ */
+const slackMentionScript = `( () => {
+	const count = ( element ) => parseInt( element?.textContent ?? '', 10 ) || 0;
+	const activity = document.querySelector( '[data-qa="tab_rail_activity_button"] .c-badge' );
+	if ( activity ) {
+		return count( activity );
+	}
+	return [ ...document.querySelectorAll( '.p-channel_sidebar__badge' ) ]
+		.reduce( ( sum, badge ) => sum + count( badge ), 0 );
+} )()`;
 
 export const serviceTypes: ServiceType[] = [
 	{
@@ -48,6 +68,17 @@ export const serviceTypes: ServiceType[] = [
 		color: '#e5332a',
 		// e.g. "(3) Chatwork"
 		parseBadge: countInParentheses,
+	},
+	{
+		type: 'slack',
+		label: 'Slack',
+		url: 'https://app.slack.com/client',
+		color: '#4a154b',
+		// Only mentions and DMs count. Other unread messages are not shown, as in Slack's own app
+		pollScript: slackMentionScript,
+		parseBadge: ( result ) => Number( result ) || 0,
+		// Slack's badges change without changing the page title
+		defaultPollInterval: 5,
 	},
 	{
 		type: 'google-calendar',

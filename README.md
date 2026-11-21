@@ -24,6 +24,7 @@ A lightweight desktop app for Windows and macOS that brings your web apps into o
 |---|---|
 | Gmail | Yes |
 | Chatwork | Yes |
+| Slack | Yes (mentions and DMs only) |
 | Google Calendar | No |
 | Google Keep | No |
 

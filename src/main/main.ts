@@ -240,6 +240,11 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		if ( ! type.parseBadge ) {
 			return;
 		}
+		// The count is not in the title, so read it from the page
+		if ( type.pollScript ) {
+			void pollService( state );
+			return;
+		}
 		setUnread( state, type.parseBadge( title ) );
 	} );
 
@@ -450,7 +455,7 @@ function addService( type: ServiceType ): void {
 		name: sameType > 0 ? `${ type.label } ${ sameType + 1 }` : type.label,
 		badge: true,
 		js: '',
-		pollInterval: 0,
+		pollInterval: type.defaultPollInterval ?? 0,
 	};
 	createServiceView( config );
 	layout();
