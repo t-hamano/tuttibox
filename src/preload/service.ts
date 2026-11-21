@@ -1,30 +1,56 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge } from 'electron';
 
 /**
  * Preload for each service page.
- * When a web notification is clicked, bring the window to the front and switch to that service.
+ * Tuttibox shows unread counts as badges and does not show desktop notifications.
+ * The main process denies the notification permission so nothing reaches the OS,
+ * and here the page sees notifications as granted and silently dropped,
+ * so services do not keep asking the user to enable notifications.
  */
-contextBridge.exposeInMainWorld( '__tuttibox', {
-	notificationClicked: () => ipcRenderer.send( 'service:notification-click' ),
-} );
-
 contextBridge.executeInMainWorld( {
 	func: () => {
-		const Original = window.Notification;
-		if ( ! Original ) {
+		if ( ! window.Notification ) {
 			return;
 		}
-		const bridge = ( window as unknown as {
-			__tuttibox: { notificationClicked: () => void };
-		} ).__tuttibox;
 
-		class TuttiboxNotification extends Original {
-			constructor( title: string, options?: NotificationOptions ) {
-				super( title, options );
-				this.addEventListener( 'click', () => bridge.notificationClicked() );
+		class SilentNotification extends EventTarget {
+			static readonly permission: NotificationPermission = 'granted';
+			static readonly maxActions = 0;
+			static requestPermission(
+				callback?: NotificationPermissionCallback
+			): Promise< NotificationPermission > {
+				callback?.( 'granted' );
+				return Promise.resolve( 'granted' );
 			}
+
+			readonly title: string;
+			readonly body: string;
+			readonly tag: string;
+			readonly icon: string;
+			readonly data: unknown;
+			onclick: ( ( event: Event ) => void ) | null = null;
+			onshow: ( ( event: Event ) => void ) | null = null;
+			onclose: ( ( event: Event ) => void ) | null = null;
+			onerror: ( ( event: Event ) => void ) | null = null;
+
+			constructor( title: string, options: NotificationOptions = {} ) {
+				super();
+				this.title = title;
+				this.body = options.body ?? '';
+				this.tag = options.tag ?? '';
+				this.icon = options.icon ?? '';
+				this.data = options.data ?? null;
+			}
+
+			close(): void {}
 		}
-		window.Notification = TuttiboxNotification;
+		window.Notification = SilentNotification as unknown as typeof Notification;
+
+		if ( window.ServiceWorkerRegistration ) {
+			const proto = ServiceWorkerRegistration.prototype;
+			proto.showNotification = () => Promise.resolve();
+			proto.getNotifications = () => Promise.resolve( [] );
+		}
 	},
 } );
 

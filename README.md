@@ -13,7 +13,7 @@ A lightweight desktop app for Windows and macOS that brings your web apps into o
 - Edit window for the name, unread badge on/off and custom JavaScript
 - Separate, persistent login session for each service (`persist:<id>` partition)
 - Unread badges in the sidebar, plus the total on the Dock (macOS) or as a taskbar overlay icon (Windows)
-- Clicking a web notification brings the window to the front and switches to that service
+- Desktop notifications from services are suppressed; unread counts are shown only as badges
 - Export / import the added apps, their settings and their order from the File menu (login sessions are not included)
 - Settings window (gear button under the add button, or File > Settings…) with a "Launch at login" toggle (macOS / Windows)
 - Automatic updates from GitHub Releases (macOS / Windows), plus File > Check for Updates…
@@ -105,7 +105,7 @@ src/
     updater.ts    Automatic updates from GitHub Releases
   preload/
     sidebar.ts    API for the sidebar
-    service.ts    Detects web notification clicks
+    service.ts    Suppresses web notifications from services
     edit.ts       API for the edit window
   renderer/
     sidebar.*     Sidebar UI
