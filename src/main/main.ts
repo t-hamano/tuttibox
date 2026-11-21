@@ -26,6 +26,13 @@ const SIDEBAR_WIDTH = 64;
 const TOP_BORDER = 1;
 const BORDER_COLOR = '#d9d9de';
 const isMac = process.platform === 'darwin';
+/**
+ * Height of the custom title bar on Windows / Linux. Like Ferdium, the menu is drawn inside
+ * the title bar instead of a separate native menu bar row. macOS keeps its native title bar.
+ */
+const TITLEBAR_HEIGHT = isMac ? 0 : 32;
+const TITLEBAR_COLOR = '#ffffff';
+const TITLEBAR_SYMBOL_COLOR = '#1c1d2e';
 
 interface ServiceState {
 	config: ServiceConfig;
@@ -75,6 +82,8 @@ if ( ! gotLock ) {
 
 let win: BaseWindow | null = null;
 let sidebar: WebContentsView;
+/** Custom title bar with the app icon and the menu (Windows / Linux only) */
+let titlebar: WebContentsView | null = null;
 /** Shown in the content area while no services have been added */
 let emptyView: WebContentsView;
 /** In sidebar order */
@@ -100,9 +109,33 @@ function createWindow(): void {
 		// taskbar shows the Tuttibox icon when running with `npm start`
 		icon: isMac ? undefined : join( __dirname, '../assets/icon.png' ),
 		backgroundColor: BORDER_COLOR,
+		// Hide the native title bar and menu bar, keeping only the window buttons
+		...( isMac
+			? {}
+			: {
+					titleBarStyle: 'hidden' as const,
+					titleBarOverlay: {
+						color: TITLEBAR_COLOR,
+						symbolColor: TITLEBAR_SYMBOL_COLOR,
+						height: TITLEBAR_HEIGHT,
+					},
+			  } ),
 	} );
 	if ( settings.maximized ) {
 		win.maximize();
+	}
+
+	if ( ! isMac ) {
+		titlebar = new WebContentsView( {
+			webPreferences: {
+				preload: join( __dirname, '../preload/titlebar.js' ),
+				sandbox: true,
+				contextIsolation: true,
+			},
+		} );
+		win.contentView.addChildView( titlebar );
+		titlebar.webContents.on( 'did-finish-load', pushTitlebarMenus );
+		titlebar.webContents.loadFile( join( __dirname, '../renderer/titlebar.html' ) );
 	}
 
 	sidebar = new WebContentsView( {
@@ -345,11 +378,13 @@ function layout(): void {
 		return;
 	}
 	const { width, height } = win.getContentBounds();
-	const contentHeight = Math.max( 0, height - TOP_BORDER );
-	sidebar.setBounds( { x: 0, y: TOP_BORDER, width: SIDEBAR_WIDTH, height: contentHeight } );
+	titlebar?.setBounds( { x: 0, y: 0, width, height: TITLEBAR_HEIGHT } );
+	const top = TITLEBAR_HEIGHT + TOP_BORDER;
+	const contentHeight = Math.max( 0, height - top );
+	sidebar.setBounds( { x: 0, y: top, width: SIDEBAR_WIDTH, height: contentHeight } );
 	const contentBounds = {
 		x: SIDEBAR_WIDTH,
-		y: TOP_BORDER,
+		y: top,
 		width: Math.max( 0, width - SIDEBAR_WIDTH ),
 		height: contentHeight,
 	};
@@ -760,6 +795,7 @@ function buildMenu(): void {
 		{ role: 'windowMenu', label: 'Window' },
 	];
 	Menu.setApplicationMenu( Menu.buildFromTemplate( template ) );
+	pushTitlebarMenus();
 
 	function zoom( delta: number ): void {
 		const wc = activeWebContents();
@@ -768,6 +804,35 @@ function buildMenu(): void {
 		}
 	}
 }
+
+function pushTitlebarMenus(): void {
+	const menu = Menu.getApplicationMenu();
+	if ( ! titlebar || titlebar.webContents.isDestroyed() || ! menu ) {
+		return;
+	}
+	titlebar.webContents.send(
+		'titlebar:menus',
+		menu.items.map( ( item ) => item.label )
+	);
+}
+
+ipcMain.on( 'titlebar:open-menu', ( event, index: number, x: number, y: number ) => {
+	const submenu = Menu.getApplicationMenu()?.items[ index ]?.submenu;
+	if ( ! submenu || ! win ) {
+		return;
+	}
+	// The title bar view sits at the top-left of the window, so its coordinates match the window's
+	submenu.popup( {
+		window: win,
+		x,
+		y,
+		callback: () => {
+			if ( ! event.sender.isDestroyed() ) {
+				event.sender.send( 'titlebar:menu-closed' );
+			}
+		},
+	} );
+} );
 
 app.on( 'second-instance', showWindow );
 app.on( 'activate', showWindow );
