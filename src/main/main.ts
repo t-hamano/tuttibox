@@ -99,7 +99,6 @@ function createWindow(): void {
 		// Packaged builds take the icon from the executable; set it here too so the
 		// taskbar shows the Tuttibox icon when running with `npm start`
 		icon: isMac ? undefined : join( __dirname, '../assets/icon.png' ),
-		autoHideMenuBar: true,
 		backgroundColor: BORDER_COLOR,
 	} );
 	if ( settings.maximized ) {
@@ -739,7 +738,7 @@ function buildMenu(): void {
 				{ label: 'Import Settings…', click: () => importServices() },
 				{ label: 'Export Settings…', click: () => exportServices() },
 				{ type: 'separator' },
-				isMac ? { role: 'close', label: 'Close Window' } : { role: 'quit', label: 'Quit' },
+				isMac ? { role: 'close', label: 'Close Window' } : { label: 'Quit Tuttibox', accelerator: 'Ctrl+Q', click: () => app.quit() },
 			],
 		},
 		// Without this menu, Cmd+C / Cmd+V do not work on macOS
