@@ -103,3 +103,23 @@ button.primary {
 	background: var(--primary);
 	color: #fff;
 }
+
+.inline {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+select {
+	padding: 5px 8px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: #fff;
+	color: inherit;
+	font: inherit;
+}
+
+select:disabled {
+	opacity: 0.5;
+}

@@ -18,7 +18,13 @@ import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { findServiceType, serviceTypes, type ServiceType } from './services';
-import { loadSettings, POLL_INTERVALS, saveSettings, type ServiceConfig } from './settings';
+import {
+	loadSettings,
+	normalizePollInterval,
+	POLL_INTERVALS,
+	saveSettings,
+	type ServiceConfig,
+} from './settings';
 import { parseServices, serializeServices } from './transfer';
 import { checkForUpdatesFromMenu, setupAutoUpdate } from './updater';
 
@@ -42,6 +48,7 @@ interface ServiceState {
 	/** Unread count read from the title (kept even when the badge is disabled) */
 	unread: number;
 	icon?: string;
+	pollTimer?: ReturnType< typeof setInterval >;
 }
 
 /** Display data sent to the sidebar */
@@ -58,8 +65,6 @@ export interface SidebarItem {
 export interface AppSettingsData {
 	openAtLogin: boolean;
 	supportsOpenAtLogin: boolean;
-	pollInterval: number;
-	pollIntervals: number[];
 }
 
 /** Data exchanged with the edit window */
@@ -67,6 +72,8 @@ export interface EditData {
 	name: string;
 	badge: boolean;
 	js: string;
+	pollInterval: number;
+	pollIntervals: number[];
 	typeLabel: string;
 	supportsBadge: boolean;
 }
@@ -220,6 +227,7 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 
 	const state: ServiceState = { config, type, view, unread: 0, icon: type.icon };
 	states.push( state );
+	startPolling( state );
 
 	const wc = view.webContents;
 	handleSignInUserAgent( wc );
@@ -442,6 +450,7 @@ function addService( type: ServiceType ): void {
 		name: sameType > 0 ? `${ type.label } ${ sameType + 1 }` : type.label,
 		badge: true,
 		js: '',
+		pollInterval: 0,
 	};
 	createServiceView( config );
 	layout();
@@ -479,6 +488,7 @@ async function removeService( id: string ): Promise< void > {
 
 /** Remove a service's view and delete its login session */
 function destroyService( state: ServiceState ): void {
+	stopPolling( state );
 	states.splice( states.indexOf( state ), 1 );
 	win?.contentView.removeChildView( state.view );
 	const ses = state.view.webContents.session;
@@ -623,7 +633,7 @@ function openSettingsWindow(): void {
 		parent: win,
 		modal: true,
 		width: 480,
-		height: 320,
+		height: 240,
 		useContentSize: true,
 		resizable: false,
 		minimizable: false,
@@ -723,19 +733,18 @@ async function pollService( state: ServiceState ): Promise< void > {
 	}
 }
 
-let pollTimer: ReturnType< typeof setInterval > | null = null;
-
-function startPolling(): void {
-	if ( pollTimer ) {
-		clearInterval( pollTimer );
-		pollTimer = null;
+/** (Re)start the service's periodic unread count check from its config */
+function startPolling( state: ServiceState ): void {
+	stopPolling( state );
+	if ( state.type.parseBadge && state.config.pollInterval > 0 ) {
+		state.pollTimer = setInterval( () => void pollService( state ), state.config.pollInterval * 1000 );
 	}
-	if ( settings.pollInterval > 0 ) {
-		pollTimer = setInterval( () => {
-			for ( const state of states ) {
-				void pollService( state );
-			}
-		}, settings.pollInterval * 1000 );
+}
+
+function stopPolling( state: ServiceState ): void {
+	if ( state.pollTimer ) {
+		clearInterval( state.pollTimer );
+		state.pollTimer = undefined;
 	}
 }
 
@@ -792,18 +801,7 @@ ipcMain.on( 'sidebar:open-settings', openSettingsWindow );
 ipcMain.handle( 'settings:get', (): AppSettingsData => ( {
 	openAtLogin: getOpenAtLogin(),
 	supportsOpenAtLogin,
-	pollInterval: settings.pollInterval,
-	pollIntervals: POLL_INTERVALS,
 } ) );
-
-ipcMain.handle( 'settings:set-poll-interval', ( _event, seconds: number ): number => {
-	if ( POLL_INTERVALS.includes( seconds ) ) {
-		settings.pollInterval = seconds;
-		saveSettings( settings );
-		startPolling();
-	}
-	return settings.pollInterval;
-} );
 
 ipcMain.handle( 'settings:set-open-at-login', ( _event, enabled: boolean ): boolean => {
 	if ( supportsOpenAtLogin ) {
@@ -837,12 +835,14 @@ ipcMain.handle( 'edit:get', ( event ): EditData | null => {
 		name: state.config.name,
 		badge: state.config.badge,
 		js: state.config.js,
+		pollInterval: state.config.pollInterval,
+		pollIntervals: POLL_INTERVALS,
 		typeLabel: state.type.label,
 		supportsBadge: !! state.type.parseBadge,
 	};
 } );
 
-ipcMain.on( 'edit:save', ( event, data: Pick< EditData, 'name' | 'badge' | 'js' > ) => {
+ipcMain.on( 'edit:save', ( event, data: Pick< EditData, 'name' | 'badge' | 'js' | 'pollInterval' > ) => {
 	const id = editWindows.get( event.sender.id );
 	const state = id ? findState( id ) : undefined;
 	if ( state ) {
@@ -850,6 +850,8 @@ ipcMain.on( 'edit:save', ( event, data: Pick< EditData, 'name' | 'badge' | 'js' 
 		state.config.name = data.name.trim() || state.type.label;
 		state.config.badge = data.badge;
 		state.config.js = data.js;
+		state.config.pollInterval = normalizePollInterval( data.pollInterval, state.config.pollInterval );
+		startPolling( state );
 		persistServices();
 		updateBadges();
 		// Already-executed JS cannot be undone, so reload the page when it changes
@@ -1000,7 +1002,6 @@ app.whenReady().then( () => {
 	createWindow();
 	buildMenu();
 	createTray();
-	startPolling();
 	setupAutoUpdate( () => {
 		// The window would otherwise hide itself instead of closing and block the install
 		quitting = true;

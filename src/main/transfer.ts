@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { findServiceType } from './services';
-import type { ServiceConfig } from './settings';
+import { normalizePollInterval, type ServiceConfig } from './settings';
 
 /** Identifies an exported file */
 const FORMAT = 'tuttibox-settings';
@@ -12,6 +12,7 @@ export interface ExportedService {
 	name: string;
 	badge: boolean;
 	js: string;
+	pollInterval: number;
 }
 
 interface ExportFile {
@@ -25,7 +26,13 @@ export function serializeServices( services: ServiceConfig[] ): string {
 	const data: ExportFile = {
 		format: FORMAT,
 		version: VERSION,
-		services: services.map( ( { type, name, badge, js } ) => ( { type, name, badge, js } ) ),
+		services: services.map( ( { type, name, badge, js, pollInterval } ) => ( {
+			type,
+			name,
+			badge,
+			js,
+			pollInterval,
+		} ) ),
 	};
 	return JSON.stringify( data, null, 2 ) + '\n';
 }
@@ -70,6 +77,7 @@ export function parseServices( text: string ): ParseResult {
 			name: typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : type.label,
 			badge: typeof entry.badge === 'boolean' ? entry.badge : true,
 			js: typeof entry.js === 'string' ? entry.js : '',
+			pollInterval: normalizePollInterval( entry.pollInterval ),
 		} );
 	}
 	return { services, skipped };
