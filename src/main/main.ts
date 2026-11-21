@@ -247,10 +247,16 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		}
 	} );
 
-	wc.setWindowOpenHandler( ( { url } ) => {
-		// Open Google sign-in and same-service popups inside the app
+	wc.setWindowOpenHandler( ( { url, disposition } ) => {
 		if ( isInternalUrl( url, type ) ) {
-			return { action: 'allow' };
+			// Links that would open in a new tab (e.g. "Sign in" on Google's landing page)
+			// load in the service view itself, so signing in there signs in the service
+			if ( disposition === 'foreground-tab' || disposition === 'background-tab' ) {
+				wc.loadURL( url );
+				return { action: 'deny' };
+			}
+			// Real popups (window.open with a size) stay popups, as the opener may wait for them
+			return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true } };
 		}
 		openExternal( url );
 		return { action: 'deny' };
