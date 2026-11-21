@@ -585,7 +585,7 @@ function createTray(): void {
 	}
 	// Pre-rendered at each size (tray.png and its @1.25x / @1.5x / @2x variants, picked up
 	// automatically) so the icon stays crisp instead of shrinking the large app icon
-	tray = new Tray( join( __dirname, '../assets/tray.png' ) );
+	tray = new Tray( trayIconPath( false ) );
 	tray.setToolTip( 'Tuttibox' );
 	tray.setContextMenu(
 		Menu.buildFromTemplate( [
@@ -595,6 +595,23 @@ function createTray(): void {
 		] )
 	);
 	tray.on( 'click', showWindow );
+}
+
+/** Tray icon with a red dot in the corner while any service has unread items */
+function trayIconPath( unread: boolean ): string {
+	return join( __dirname, `../assets/${ unread ? 'tray-unread' : 'tray' }.png` );
+}
+
+let trayUnread = false;
+
+function updateTrayIcon( total: number ): void {
+	const unread = total > 0;
+	if ( ! tray || unread === trayUnread ) {
+		return;
+	}
+	trayUnread = unread;
+	tray.setImage( trayIconPath( unread ) );
+	tray.setToolTip( unread ? `Tuttibox (${ total } unread)` : 'Tuttibox' );
 }
 
 function badgeOf( state: ServiceState ): number {
@@ -623,6 +640,7 @@ function updateBadges(): void {
 		app.setBadgeCount( total );
 	}
 	// On Windows, the sidebar draws the overlay icon and sends it via `badge:overlay`
+	updateTrayIcon( total );
 }
 
 ipcMain.on( 'sidebar:select', ( _event, id: string ) => activate( id ) );
