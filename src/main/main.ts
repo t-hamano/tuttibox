@@ -107,7 +107,9 @@ function createWindow(): void {
 		title: 'Tuttibox',
 		// Packaged builds take the icon from the executable; set it here too so the
 		// taskbar shows the Tuttibox icon when running with `npm start`
-		icon: isMac ? undefined : join( __dirname, '../assets/icon.png' ),
+		icon: isMac
+			? undefined
+			: join( __dirname, `../assets/icon.${ process.platform === 'win32' ? 'ico' : 'png' }` ),
 		backgroundColor: BORDER_COLOR,
 		// Hide the native title bar and menu bar, keeping only the window buttons
 		...( isMac
@@ -123,6 +125,14 @@ function createWindow(): void {
 	} );
 	if ( settings.maximized ) {
 		win.maximize();
+	}
+	if ( process.platform === 'win32' && ! app.isPackaged ) {
+		// With an App User Model ID set, the Windows taskbar takes the icon from the window's
+		// relaunch icon rather than the window icon, and falls back to electron.exe's icon
+		win.setAppDetails( {
+			appId: 'com.t-hamano.tuttibox',
+			appIconPath: join( __dirname, '../assets/icon.ico' ),
+		} );
 	}
 
 	if ( ! isMac ) {
@@ -618,8 +628,8 @@ function createTray(): void {
 	if ( isMac ) {
 		return;
 	}
-	// Pre-rendered at each size (tray.png and its @1.25x / @1.5x / @2x variants, picked up
-	// automatically) so the icon stays crisp instead of shrinking the large app icon
+	// Pre-rendered at each size (an ICO on Windows, PNG with @1.25x / @1.5x / @2x variants
+	// elsewhere) so the icon stays crisp instead of shrinking the large app icon
 	tray = new Tray( trayIconPath( false ) );
 	tray.setToolTip( 'Tuttibox' );
 	tray.setContextMenu(
@@ -634,7 +644,10 @@ function createTray(): void {
 
 /** Tray icon with a red dot in the corner while any service has unread items */
 function trayIconPath( unread: boolean ): string {
-	return join( __dirname, `../assets/${ unread ? 'tray-unread' : 'tray' }.png` );
+	// Windows draws semi-transparent pixels of PNG tray icons too dark, which leaves grey
+	// smudges around the rounded corners. ICO files (one image per size) are drawn correctly
+	const ext = process.platform === 'win32' ? 'ico' : 'png';
+	return join( __dirname, `../assets/${ unread ? 'tray-unread' : 'tray' }.${ ext }` );
 }
 
 let trayUnread = false;

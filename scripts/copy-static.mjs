@@ -10,11 +10,12 @@ for (const file of readdirSync(src)) {
 	}
 }
 
-// Window icon and tray icons (tray.png / tray-unread.png plus @1.25x / @1.5x / @2x for high DPI) used on Windows / Linux
+// Window icon and tray icons used on Windows / Linux: ICO on Windows, PNG plus @1.25x / @1.5x / @2x on Linux
 mkdirSync('dist/assets', { recursive: true });
 cpSync('build/icon-win.png', 'dist/assets/icon.png');
+cpSync('build/icon-win.ico', 'dist/assets/icon.ico');
 for (const file of readdirSync('build')) {
-	if (/^tray(-unread)?(@[\d.]+x)?\.png$/.test(file)) {
+	if (/^tray(-unread)?((@[\d.]+x)?\.png|\.ico)$/.test(file)) {
 		cpSync(join('build', file), join('dist/assets', file));
 	}
 }
