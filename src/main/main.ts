@@ -175,6 +175,8 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 			preload: join( __dirname, '../preload/service.js' ),
 			// Read by the preload to present the page as Firefox on the sign-in host
 			additionalArguments: [ `--tuttibox-sign-in-ua=${ SIGN_IN_USER_AGENT }` ],
+			// Also run the preload in iframes, so sign-in frames embedded in other pages look the same
+			nodeIntegrationInSubFrames: true,
 			sandbox: true,
 			contextIsolation: true,
 			spellcheck: false,
@@ -296,8 +298,14 @@ function setupSession( partition: string ): void {
 	} );
 	ses.setPermissionCheckHandler( ( _wc, permission ) => allowed.has( permission ) );
 
-	// Match the request headers to the Firefox UA the sign-in page sees (Firefox sends no client hints)
-	ses.webRequest.onBeforeSendHeaders( { urls: [ `https://${ SIGN_IN_HOST }/*` ] }, ( details, callback ) => {
+	// Match the request headers to the Firefox UA the sign-in page sees (Firefox sends no client hints).
+	// This covers requests to the sign-in host and every request made while a sign-in page is open,
+	// because a mix of Firefox and Chrome headers in one sign-in attempt can still get it blocked.
+	ses.webRequest.onBeforeSendHeaders( ( details, callback ) => {
+		if ( ! isSignInRequest( details ) ) {
+			callback( {} );
+			return;
+		}
 		const requestHeaders: Record< string, string > = {};
 		for ( const [ key, value ] of Object.entries( details.requestHeaders ) ) {
 			const lower = key.toLowerCase();
@@ -309,6 +317,21 @@ function setupSession( partition: string ): void {
 		requestHeaders[ 'User-Agent' ] = SIGN_IN_USER_AGENT;
 		callback( { requestHeaders } );
 	} );
+}
+
+function isSignInRequest( details: Electron.OnBeforeSendHeadersListenerDetails ): boolean {
+	if ( hostnameOf( details.url ) === SIGN_IN_HOST ) {
+		return true;
+	}
+	try {
+		return (
+			hostnameOf( details.frame?.url ?? '' ) === SIGN_IN_HOST ||
+			hostnameOf( details.webContents?.getURL() ?? '' ) === SIGN_IN_HOST
+		);
+	} catch {
+		// The frame may already be gone
+		return false;
+	}
 }
 
 function hostnameOf( url: string ): string | undefined {
