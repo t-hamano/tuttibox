@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { findServiceType, serviceTypes, type ServiceType } from './services';
 import { loadSettings, POLL_INTERVALS, saveSettings, type ServiceConfig } from './settings';
 import { parseServices, serializeServices } from './transfer';
+import { checkForUpdatesFromMenu, setupAutoUpdate } from './updater';
 
 const SIDEBAR_WIDTH = 64;
 /** Thickness of the top border. Views are shifted down by this amount so the window background shows through as a line */
@@ -914,6 +915,7 @@ function buildMenu(): void {
 				{ label: 'Export Settings…', click: () => exportServices() },
 				{ type: 'separator' },
 				{ label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: () => openSettingsWindow() },
+				{ label: 'Check for Updates…', click: () => checkForUpdatesFromMenu() },
 				{ type: 'separator' },
 				isMac ? { role: 'close', label: 'Close Window' } : { label: 'Quit Tuttibox', accelerator: 'Ctrl+Q', click: () => app.quit() },
 			],
@@ -999,4 +1001,8 @@ app.whenReady().then( () => {
 	buildMenu();
 	createTray();
 	startPolling();
+	setupAutoUpdate( () => {
+		// The window would otherwise hide itself instead of closing and block the install
+		quitting = true;
+	} );
 } );
