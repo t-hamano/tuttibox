@@ -12,6 +12,7 @@ import {
 	shell,
 	Tray,
 	type MenuItemConstructorOptions,
+	type Rectangle,
 	type WebContents,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
@@ -222,6 +223,10 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 			spellcheck: false,
 		},
 	} );
+	// Size the view before hiding it. A view hidden before it has a size loads its page
+	// at 0x0, and some pages (e.g. Google Calendar's month view) keep that broken layout
+	// even after the view is shown and resized
+	view.setBounds( getContentBounds() );
 	view.setVisible( false );
 	win!.contentView.addChildView( view );
 
@@ -396,21 +401,26 @@ function openExternal( url: string ): void {
 	}
 }
 
+/** Bounds of the area right of the sidebar, where the service views are shown */
+function getContentBounds(): Rectangle {
+	const { width, height } = win!.getContentBounds();
+	const top = TITLEBAR_HEIGHT + TOP_BORDER;
+	return {
+		x: SIDEBAR_WIDTH,
+		y: top,
+		width: Math.max( 0, width - SIDEBAR_WIDTH ),
+		height: Math.max( 0, height - top ),
+	};
+}
+
 function layout(): void {
 	if ( ! win ) {
 		return;
 	}
-	const { width, height } = win.getContentBounds();
+	const { width } = win.getContentBounds();
 	titlebar?.setBounds( { x: 0, y: 0, width, height: TITLEBAR_HEIGHT } );
-	const top = TITLEBAR_HEIGHT + TOP_BORDER;
-	const contentHeight = Math.max( 0, height - top );
-	sidebar.setBounds( { x: 0, y: top, width: SIDEBAR_WIDTH, height: contentHeight } );
-	const contentBounds = {
-		x: SIDEBAR_WIDTH,
-		y: top,
-		width: Math.max( 0, width - SIDEBAR_WIDTH ),
-		height: contentHeight,
-	};
+	const contentBounds = getContentBounds();
+	sidebar.setBounds( { x: 0, y: contentBounds.y, width: SIDEBAR_WIDTH, height: contentBounds.height } );
 	emptyView.setBounds( contentBounds );
 	for ( const { view } of states ) {
 		view.setBounds( contentBounds );
