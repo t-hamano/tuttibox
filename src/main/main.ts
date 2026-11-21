@@ -116,11 +116,6 @@ function createWindow(): void {
 		minWidth: 600,
 		minHeight: 400,
 		title: 'Tuttibox',
-		// Packaged builds take the icon from the executable; set it here too so the
-		// taskbar shows the Tuttibox icon when running with `npm start`
-		icon: isMac
-			? undefined
-			: join( __dirname, `../assets/icon.${ process.platform === 'win32' ? 'ico' : 'png' }` ),
 		backgroundColor: BORDER_COLOR,
 		// Hide the native title bar and menu bar, keeping only the window buttons
 		...( isMac
@@ -137,15 +132,6 @@ function createWindow(): void {
 	if ( settings.maximized ) {
 		win.maximize();
 	}
-	if ( process.platform === 'win32' && ! app.isPackaged ) {
-		// With an App User Model ID set, the Windows taskbar takes the icon from the window's
-		// relaunch icon rather than the window icon, and falls back to electron.exe's icon
-		win.setAppDetails( {
-			appId: 'com.t-hamano.tuttibox',
-			appIconPath: join( __dirname, '../assets/icon.ico' ),
-		} );
-	}
-
 	if ( ! isMac ) {
 		titlebar = new WebContentsView( {
 			webPreferences: {
