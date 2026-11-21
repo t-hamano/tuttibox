@@ -4,7 +4,6 @@ interface SidebarItem {
 	color: string;
 	icon?: string;
 	badge: number;
-	hideBadge: boolean;
 	active: boolean;
 }
 
@@ -63,7 +62,7 @@ interface TuttiboxApi {
 			button.append( letter );
 		}
 
-		if ( item.badge > 0 && ! item.hideBadge ) {
+		if ( item.badge > 0 ) {
 			const badge = document.createElement( 'span' );
 			badge.className = 'badge';
 			badge.textContent = formatBadge( item.badge );

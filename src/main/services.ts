@@ -12,10 +12,11 @@ export interface ServiceType {
 	 */
 	parseBadge?: ( title: string ) => number;
 	/**
-	 * Whether the service's own favicon already shows the unread count.
-	 * If so, the sidebar does not draw its own badge on top of it.
+	 * Fixed icon URL to use instead of the page's favicon.
+	 * Set this when the service draws the unread count into its favicon,
+	 * so the count is not shown twice next to the sidebar badge.
 	 */
-	faviconShowsCount?: boolean;
+	icon?: string;
 }
 
 /** Treat the first "(number)" in the title as the unread count */
@@ -32,8 +33,8 @@ export const serviceTypes: ServiceType[] = [
 		color: '#ea4335',
 		// e.g. "Inbox (3) - user@gmail.com - Gmail"
 		parseBadge: countInParentheses,
-		// Gmail draws the unread count into its favicon
-		faviconShowsCount: true,
+		// Gmail's favicon includes the unread count, so use the plain icon instead
+		icon: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico',
 	},
 	{
 		type: 'chatwork',

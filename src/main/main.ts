@@ -41,8 +41,6 @@ export interface SidebarItem {
 	color: string;
 	icon?: string;
 	badge: number;
-	/** Do not draw the badge on the icon (still counted in the taskbar/Dock total) */
-	hideBadge: boolean;
 	active: boolean;
 }
 
@@ -185,7 +183,7 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 	view.setVisible( false );
 	win!.contentView.addChildView( view );
 
-	const state: ServiceState = { config, type, view, unread: 0 };
+	const state: ServiceState = { config, type, view, unread: 0, icon: type.icon };
 	states.push( state );
 
 	const wc = view.webContents;
@@ -207,6 +205,10 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 
 	const serviceHost = new URL( type.url ).hostname;
 	wc.on( 'page-favicon-updated', ( _event, favicons ) => {
+		// The service type has a fixed icon
+		if ( type.icon ) {
+			return;
+		}
 		// Ignore icons of other pages such as the sign-in page (Google's logo instead of Gmail's)
 		if ( hostnameOf( wc.getURL() ) !== serviceHost ) {
 			return;
@@ -525,7 +527,6 @@ function pushSidebarState(): void {
 		color: state.type.color,
 		icon: state.icon,
 		badge: badgeOf( state ),
-		hideBadge: !! state.type.faviconShowsCount && !! state.icon,
 		active: state.config.id === activeId,
 	} ) );
 	sidebar.webContents.send( 'sidebar:state', items );
