@@ -190,10 +190,15 @@ function createWindow(): void {
 	win.on( 'close', ( event ) => {
 		persistWindow();
 		// Keep the app running when the window is closed. It stays in the Dock on macOS
-		// and in the notification area on Windows / Linux; quit from the menu or the tray
+		// and in the notification area on Windows / Linux; quit from the menu or the tray.
+		// On Windows, minimize instead of hiding so the window stays on the taskbar
 		if ( ! quitting ) {
 			event.preventDefault();
-			win?.hide();
+			if ( process.platform === 'win32' ) {
+				win?.minimize();
+			} else {
+				win?.hide();
+			}
 		}
 	} );
 	// Do not block Windows shutdown / sign-out by hiding the window instead of closing it
@@ -897,9 +902,13 @@ function persistWindow(): void {
 	if ( ! win ) {
 		return;
 	}
-	settings.maximized = win.isMaximized();
+	// A minimized window does not report its maximized state or position reliably,
+	// so keep the saved maximized state and use the bounds it will be restored to
+	if ( ! win.isMinimized() ) {
+		settings.maximized = win.isMaximized();
+	}
 	if ( ! settings.maximized ) {
-		settings.bounds = win.getBounds();
+		settings.bounds = win.getNormalBounds();
 	}
 	saveSettings( settings );
 }
