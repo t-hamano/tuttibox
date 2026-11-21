@@ -104,6 +104,9 @@ function createWindow(): void {
 		minWidth: 600,
 		minHeight: 400,
 		title: 'Tuttibox',
+		// Packaged builds take the icon from the executable; set it here too so the
+		// taskbar shows the Tuttibox icon when running with `npm start`
+		icon: isMac ? undefined : join( __dirname, '../assets/icon.png' ),
 		autoHideMenuBar: true,
 		backgroundColor: BORDER_COLOR,
 	} );
@@ -584,10 +587,9 @@ function createTray(): void {
 	if ( isMac ) {
 		return;
 	}
-	const icon = nativeImage
-		.createFromPath( join( __dirname, '../assets/tray.png' ) )
-		.resize( { width: 16, height: 16, quality: 'best' } );
-	tray = new Tray( icon );
+	// Pre-rendered at each size (tray.png and its @1.25x / @1.5x / @2x variants, picked up
+	// automatically) so the icon stays crisp instead of shrinking the large app icon
+	tray = new Tray( join( __dirname, '../assets/tray.png' ) );
 	tray.setToolTip( 'Tuttibox' );
 	tray.setContextMenu(
 		Menu.buildFromTemplate( [
