@@ -12,6 +12,7 @@ interface TuttiboxApi {
 	select: ( id: string ) => void;
 	reorder: ( ids: string[] ) => void;
 	showAddMenu: () => void;
+	openSettings: () => void;
 	showContextMenu: ( id: string ) => void;
 	setOverlay: ( dataUrl: string | null, total: number ) => void;
 }
@@ -24,6 +25,7 @@ interface TuttiboxApi {
 	let dragging: HTMLElement | null = null;
 
 	addButton.addEventListener( 'click', () => api.showAddMenu() );
+	document.getElementById( 'settings' )!.addEventListener( 'click', () => api.openSettings() );
 
 	function formatBadge( count: number ): string {
 		return count > 99 ? '99+' : String( count );

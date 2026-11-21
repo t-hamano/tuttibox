@@ -53,6 +53,12 @@ export interface SidebarItem {
 	active: boolean;
 }
 
+/** Data shown in the settings window */
+export interface AppSettingsData {
+	openAtLogin: boolean;
+	supportsOpenAtLogin: boolean;
+}
+
 /** Data exchanged with the edit window */
 export interface EditData {
 	name: string;
@@ -95,6 +101,9 @@ let tray: Tray | null = null;
 const settings = loadSettings();
 /** Edit window webContents.id -> service ID */
 const editWindows = new Map< number, string >();
+let settingsWindow: BrowserWindow | null = null;
+/** Electron can register the app to launch at login only on macOS and Windows */
+const supportsOpenAtLogin = process.platform === 'darwin' || process.platform === 'win32';
 
 function createWindow(): void {
 	win = new BaseWindow( {
@@ -617,6 +626,43 @@ function openEditWindow( id: string ): void {
 	editWin.loadFile( join( __dirname, '../renderer/edit.html' ) );
 }
 
+function openSettingsWindow(): void {
+	if ( ! win ) {
+		return;
+	}
+	if ( settingsWindow ) {
+		settingsWindow.focus();
+		return;
+	}
+	settingsWindow = new BrowserWindow( {
+		parent: win,
+		modal: true,
+		width: 480,
+		height: 240,
+		useContentSize: true,
+		resizable: false,
+		minimizable: false,
+		maximizable: false,
+		title: 'Settings',
+		show: false,
+		autoHideMenuBar: true,
+		webPreferences: {
+			preload: join( __dirname, '../preload/settings.js' ),
+			sandbox: true,
+			contextIsolation: true,
+		},
+	} );
+	settingsWindow.on( 'closed', () => {
+		settingsWindow = null;
+	} );
+	settingsWindow.once( 'ready-to-show', () => settingsWindow?.show() );
+	settingsWindow.loadFile( join( __dirname, '../renderer/settings.html' ) );
+}
+
+function getOpenAtLogin(): boolean {
+	return supportsOpenAtLogin && app.getLoginItemSettings().openAtLogin;
+}
+
 function showWindow(): void {
 	if ( ! win ) {
 		createWindow();
@@ -709,6 +755,22 @@ ipcMain.on( 'sidebar:add-menu', () => {
 		} ) )
 	).popup();
 } );
+
+ipcMain.on( 'sidebar:open-settings', openSettingsWindow );
+
+ipcMain.handle( 'settings:get', (): AppSettingsData => ( {
+	openAtLogin: getOpenAtLogin(),
+	supportsOpenAtLogin,
+} ) );
+
+ipcMain.handle( 'settings:set-open-at-login', ( _event, enabled: boolean ): boolean => {
+	if ( supportsOpenAtLogin ) {
+		app.setLoginItemSettings( { openAtLogin: enabled } );
+	}
+	return getOpenAtLogin();
+} );
+
+ipcMain.on( 'settings:close', () => settingsWindow?.close() );
 
 ipcMain.on( 'sidebar:context-menu', ( _event, id: string ) => {
 	const state = findState( id );
@@ -809,6 +871,8 @@ function buildMenu(): void {
 				{ type: 'separator' },
 				{ label: 'Import Settings…', click: () => importServices() },
 				{ label: 'Export Settings…', click: () => exportServices() },
+				{ type: 'separator' },
+				{ label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: () => openSettingsWindow() },
 				{ type: 'separator' },
 				isMac ? { role: 'close', label: 'Close Window' } : { label: 'Quit Tuttibox', accelerator: 'Ctrl+Q', click: () => app.quit() },
 			],

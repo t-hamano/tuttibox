@@ -42,7 +42,8 @@ body {
 }
 
 .service,
-.add {
+.add,
+.settings {
 	position: relative;
 	flex-shrink: 0;
 	width: 48px;
@@ -57,7 +58,8 @@ body {
 }
 
 .service:hover,
-.add:hover {
+.add:hover,
+.settings:hover {
 	background: var(--hover);
 }
 
@@ -81,17 +83,27 @@ body {
 }
 
 .service:focus-visible,
-.add:focus-visible {
+.add:focus-visible,
+.settings:focus-visible {
 	outline: 2px solid var(--accent);
 	outline-offset: 1px;
 }
 
 .add {
-	margin: 8px 0 12px;
+	margin: 8px 0 4px;
+}
+
+.settings {
+	margin: 0 0 12px;
+}
+
+.add,
+.settings {
 	color: var(--muted);
 }
 
-.add:hover {
+.add:hover,
+.settings:hover {
 	color: var(--accent);
 }
 

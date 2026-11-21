@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+	<link rel="stylesheet" href="settings.css">
+	<title>Settings</title>
+</head>
+<body>
+	<main>
+		<h1>Settings</h1>
+
+		<label class="row">
+			<span class="text">
+				<span class="label">Launch at login</span>
+				<span id="login-note" class="note">Start Tuttibox automatically when you sign in to your computer.</span>
+			</span>
+			<input id="open-at-login" class="toggle" type="checkbox" role="switch">
+		</label>
+
+		<div class="actions">
+			<button id="close" type="button" class="primary">Close</button>
+		</div>
+	</main>
+	<script src="settings.js"></script>
+</body>
+</html>
