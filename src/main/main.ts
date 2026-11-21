@@ -62,19 +62,11 @@ app.userAgentFallback = app.userAgentFallback
 
 /**
  * Google sign-in blocks embedded Chromium even with a plain Chrome UA
- * ("This browser or app may not be secure"), but accepts Firefox.
- * So only on the sign-in host, present the app as Firefox.
+ * ("This browser or app may not be secure"). Like Ferdium, drop the Chrome
+ * version from the UA while on the sign-in host.
  */
 const SIGN_IN_HOST = 'accounts.google.com';
-const SIGN_IN_USER_AGENT = ( () => {
-	const os =
-		process.platform === 'darwin'
-			? 'Macintosh; Intel Mac OS X 10.15'
-			: process.platform === 'win32'
-			? 'Windows NT 10.0; Win64; x64'
-			: 'X11; Linux x86_64';
-	return `Mozilla/5.0 (${ os }; rv:140.0) Gecko/20100101 Firefox/140.0`;
-} )();
+const SIGN_IN_USER_AGENT = app.userAgentFallback.replace( /Chrome\/[\d.]+/, 'Chrome' );
 
 const gotLock = app.requestSingleInstanceLock();
 if ( ! gotLock ) {
@@ -178,8 +170,6 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		webPreferences: {
 			partition,
 			preload: join( __dirname, '../preload/service.js' ),
-			// Read by the preload to present the page as Firefox on the sign-in host
-			additionalArguments: [ `--tuttibox-sign-in-ua=${ SIGN_IN_USER_AGENT }` ],
 			sandbox: true,
 			contextIsolation: true,
 			spellcheck: false,
@@ -192,6 +182,7 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 	states.push( state );
 
 	const wc = view.webContents;
+	handleSignInUserAgent( wc );
 
 	wc.on( 'did-finish-load', () => {
 		runCustomJs( state );
@@ -304,20 +295,22 @@ function setupSession( partition: string ): void {
 		callback( allowed.has( permission ) );
 	} );
 	ses.setPermissionCheckHandler( ( _wc, permission ) => allowed.has( permission ) );
+}
 
-	// Match the request headers to the Firefox UA the sign-in page sees (Firefox sends no client hints)
-	ses.webRequest.onBeforeSendHeaders( { urls: [ `https://${ SIGN_IN_HOST }/*` ] }, ( details, callback ) => {
-		const requestHeaders: Record< string, string > = {};
-		for ( const [ key, value ] of Object.entries( details.requestHeaders ) ) {
-			const lower = key.toLowerCase();
-			if ( lower === 'user-agent' || lower.startsWith( 'sec-ch-ua' ) ) {
-				continue;
-			}
-			requestHeaders[ key ] = value;
+/**
+ * Switch the UA when a page has finished navigating to or away from the sign-in host.
+ * Switching during a navigation or redirect cancels it, which breaks redirect chains such as SAML.
+ */
+function handleSignInUserAgent( wc: WebContents ): void {
+	wc.on( 'did-navigate', ( _event, url ) => {
+		const userAgent =
+			hostnameOf( url ) === SIGN_IN_HOST ? SIGN_IN_USER_AGENT : app.userAgentFallback;
+		if ( wc.getUserAgent() !== userAgent ) {
+			wc.setUserAgent( userAgent );
 		}
-		requestHeaders[ 'User-Agent' ] = SIGN_IN_USER_AGENT;
-		callback( { requestHeaders } );
 	} );
+	// Sign-in popups opened from the service
+	wc.on( 'did-create-window', ( child ) => handleSignInUserAgent( child.webContents ) );
 }
 
 function hostnameOf( url: string ): string | undefined {
