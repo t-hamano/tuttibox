@@ -32,15 +32,15 @@ import { checkForUpdatesFromMenu, setupAutoUpdate } from './updater';
 const SIDEBAR_WIDTH = 64;
 /** Thickness of the top border. Views are shifted down by this amount so the window background shows through as a line */
 const TOP_BORDER = 1;
-const BORDER_COLOR = '#d9d9de';
+const BORDER_COLOR = '#1d1e23';
 const isMac = process.platform === 'darwin';
 /**
  * Height of the custom title bar on Windows / Linux. Like Ferdium, the menu is drawn inside
  * the title bar instead of a separate native menu bar row. macOS keeps its native title bar.
  */
 const TITLEBAR_HEIGHT = isMac ? 0 : 32;
-const TITLEBAR_COLOR = '#ffffff';
-const TITLEBAR_SYMBOL_COLOR = '#1c1d2e';
+const TITLEBAR_COLOR = '#2b2c33';
+const TITLEBAR_SYMBOL_COLOR = '#e6e6ea';
 
 interface ServiceState {
 	config: ServiceConfig;
