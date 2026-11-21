@@ -58,7 +58,7 @@ Output goes to `release/`. Build each platform on that platform.
 - macOS: signed with Developer ID Application and notarized. Universal (Intel / Apple Silicon). The `.zip` is what the updater downloads; the `.dmg` is for first installs.
 - Windows: not signed (x64 / arm64). SmartScreen warns on the first install; updates install without a prompt.
 
-The app checks for updates 10 seconds after launch and every 4 hours, downloads in the background and asks to restart. If the user picks "Later", the update is installed on the next quit. Updates need the repository to be public, since the app reads GitHub Releases without a token. Development builds (`npm start`) never check.
+The app checks for updates 10 seconds after launch (and from File > Check for Updates…), downloads in the background and asks to restart. If the user picks "Later", the update is installed on the next quit. Updates need the repository to be public, since the app reads GitHub Releases without a token. Development builds (`npm start`) never check.
 
 Required repository secrets:
 

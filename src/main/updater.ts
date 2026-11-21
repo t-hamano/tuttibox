@@ -1,10 +1,8 @@
 import { app, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
-/** First check shortly after launch, so startup is not slowed down */
+/** Check shortly after launch, so startup is not slowed down */
 const FIRST_CHECK_DELAY = 10 * 1000;
-/** Later checks while the app keeps running */
-const CHECK_INTERVAL = 4 * 60 * 60 * 1000;
 
 let checking = false;
 /** Set while a check started from the menu is running, so its result is shown to the user */
@@ -51,10 +49,6 @@ export function setupAutoUpdate( onBeforeInstall: () => void ): void {
 		}
 	} );
 	autoUpdater.on( 'update-downloaded', ( info ) => {
-		// Ask once per version; the periodic check can download the same version again
-		if ( downloadedVersion === info.version ) {
-			return;
-		}
 		downloadedVersion = info.version;
 		promptRestart();
 	} );
@@ -71,7 +65,6 @@ export function setupAutoUpdate( onBeforeInstall: () => void ): void {
 	} );
 
 	setTimeout( check, FIRST_CHECK_DELAY );
-	setInterval( check, CHECK_INTERVAL );
 }
 
 /** "Check for Updates…" menu item */
