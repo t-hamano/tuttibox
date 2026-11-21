@@ -52,8 +52,7 @@ h1 {
 	color: var(--muted);
 }
 
-input[type="text"],
-textarea {
+input[type="text"] {
 	width: 100%;
 	padding: 8px 10px;
 	border: 1px solid var(--border);
@@ -62,13 +61,17 @@ textarea {
 	color: inherit;
 }
 
-textarea {
+.code-editor {
 	flex: 1;
 	min-height: 80px;
-	resize: none;
-	font-family: ui-monospace, "SF Mono", Consolas, monospace;
-	font-size: 12px;
-	tab-size: 4;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.code-editor:focus-within {
+	outline: 2px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
 }
 
 .check {

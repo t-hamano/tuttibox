@@ -8,6 +8,10 @@ interface EditData {
 	supportsBadge: boolean;
 }
 
+interface CodeEditor {
+	getValue: () => string;
+}
+
 interface EditApi {
 	get: () => Promise< EditData | null >;
 	save: ( data: Pick< EditData, 'name' | 'badge' | 'js' | 'pollInterval' > ) => void;
@@ -34,6 +38,8 @@ interface EditApi {
 	badge.disabled = ! data.supportsBadge;
 	$( 'badge-note' ).hidden = data.supportsBadge;
 	js.value = data.js;
+	const editor = ( window as unknown as { TuttiboxCodeEditor: { create: ( textarea: HTMLTextAreaElement, label: string ) => CodeEditor } } )
+		.TuttiboxCodeEditor.create( js, 'Custom JavaScript' );
 	for ( const seconds of data.pollIntervals ) {
 		const option = document.createElement( 'option' );
 		option.value = String( seconds );
@@ -44,20 +50,12 @@ interface EditApi {
 	pollInterval.disabled = ! data.supportsBadge;
 	name.focus();
 
-	// Insert a tab character instead of moving focus
-	js.addEventListener( 'keydown', ( event ) => {
-		if ( event.key === 'Tab' && ! event.shiftKey ) {
-			event.preventDefault();
-			js.setRangeText( '\t', js.selectionStart, js.selectionEnd, 'end' );
-		}
-	} );
-
 	form.addEventListener( 'submit', ( event ) => {
 		event.preventDefault();
 		api.save( {
 			name: name.value,
 			badge: badge.checked,
-			js: js.value,
+			js: editor.getValue(),
 			pollInterval: Number( pollInterval.value ),
 		} );
 	} );

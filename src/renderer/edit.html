@@ -26,16 +26,17 @@
 			<select id="poll-interval"></select>
 		</label>
 
-		<label class="field grow">
+		<div class="field grow">
 			<span class="label">Custom JavaScript <small>(runs on every page load; the page reloads when changed)</small></span>
 			<textarea id="js" spellcheck="false" placeholder="e.g. console.log( 'loaded' );"></textarea>
-		</label>
+		</div>
 
 		<div class="actions">
 			<button id="cancel" type="button">Cancel</button>
 			<button type="submit" class="primary">Save</button>
 		</div>
 	</form>
+	<script src="code-editor.js"></script>
 	<script src="edit.js"></script>
 </body>
 </html>
