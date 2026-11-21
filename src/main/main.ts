@@ -18,7 +18,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { findServiceType, serviceTypes, type ServiceType } from './services';
-import { loadSettings, saveSettings, type ServiceConfig } from './settings';
+import { loadSettings, POLL_INTERVALS, saveSettings, type ServiceConfig } from './settings';
 import { parseServices, serializeServices } from './transfer';
 
 const SIDEBAR_WIDTH = 64;
@@ -57,6 +57,8 @@ export interface SidebarItem {
 export interface AppSettingsData {
 	openAtLogin: boolean;
 	supportsOpenAtLogin: boolean;
+	pollInterval: number;
+	pollIntervals: number[];
 }
 
 /** Data exchanged with the edit window */
@@ -243,11 +245,7 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		if ( ! type.parseBadge ) {
 			return;
 		}
-		const unread = type.parseBadge( title );
-		if ( unread !== state.unread ) {
-			state.unread = unread;
-			updateBadges();
-		}
+		setUnread( state, type.parseBadge( title ) );
 	} );
 
 	const serviceHost = new URL( type.url ).hostname;
@@ -638,7 +636,7 @@ function openSettingsWindow(): void {
 		parent: win,
 		modal: true,
 		width: 480,
-		height: 240,
+		height: 320,
 		useContentSize: true,
 		resizable: false,
 		minimizable: false,
@@ -714,6 +712,46 @@ function updateTrayIcon( total: number ): void {
 	tray.setToolTip( unread ? `Tuttibox (${ total } unread)` : 'Tuttibox' );
 }
 
+function setUnread( state: ServiceState, unread: number ): void {
+	if ( unread !== state.unread ) {
+		state.unread = unread;
+		updateBadges();
+	}
+}
+
+/** Read the unread count from the page now, in case the title change was missed */
+async function pollService( state: ServiceState ): Promise< void > {
+	const { parseBadge, pollScript } = state.type;
+	const wc = state.view.webContents;
+	if ( ! parseBadge || wc.isDestroyed() || wc.isLoading() ) {
+		return;
+	}
+	try {
+		const result: unknown = await wc.executeJavaScript( pollScript ?? 'document.title' );
+		if ( states.includes( state ) ) {
+			setUnread( state, parseBadge( String( result ?? '' ) ) );
+		}
+	} catch {
+		// The page navigated away or the script failed; try again on the next check
+	}
+}
+
+let pollTimer: ReturnType< typeof setInterval > | null = null;
+
+function startPolling(): void {
+	if ( pollTimer ) {
+		clearInterval( pollTimer );
+		pollTimer = null;
+	}
+	if ( settings.pollInterval > 0 ) {
+		pollTimer = setInterval( () => {
+			for ( const state of states ) {
+				void pollService( state );
+			}
+		}, settings.pollInterval * 1000 );
+	}
+}
+
 function badgeOf( state: ServiceState ): number {
 	return state.config.badge ? state.unread : 0;
 }
@@ -743,7 +781,13 @@ function updateBadges(): void {
 	updateTrayIcon( total );
 }
 
-ipcMain.on( 'sidebar:select', ( _event, id: string ) => activate( id ) );
+ipcMain.on( 'sidebar:select', ( _event, id: string ) => {
+	activate( id );
+	const state = findState( id );
+	if ( state ) {
+		void pollService( state );
+	}
+} );
 
 ipcMain.on( 'sidebar:reorder', ( _event, ids: string[] ) => reorderServices( ids ) );
 
@@ -761,7 +805,18 @@ ipcMain.on( 'sidebar:open-settings', openSettingsWindow );
 ipcMain.handle( 'settings:get', (): AppSettingsData => ( {
 	openAtLogin: getOpenAtLogin(),
 	supportsOpenAtLogin,
+	pollInterval: settings.pollInterval,
+	pollIntervals: POLL_INTERVALS,
 } ) );
+
+ipcMain.handle( 'settings:set-poll-interval', ( _event, seconds: number ): number => {
+	if ( POLL_INTERVALS.includes( seconds ) ) {
+		settings.pollInterval = seconds;
+		saveSettings( settings );
+		startPolling();
+	}
+	return settings.pollInterval;
+} );
 
 ipcMain.handle( 'settings:set-open-at-login', ( _event, enabled: boolean ): boolean => {
 	if ( supportsOpenAtLogin ) {
@@ -957,4 +1012,5 @@ app.whenReady().then( () => {
 	createWindow();
 	buildMenu();
 	createTray();
+	startPolling();
 } );
