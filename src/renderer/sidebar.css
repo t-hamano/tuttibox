@@ -1,10 +1,11 @@
 :root {
-	--bg: #ffffff;
-	--border: #d9d9de;
-	--hover: #f0f0f3;
-	--active: #e4e4ea;
-	--accent: #1c1d2e;
-	--muted: #6b6d7a;
+	--bg: #2b2c33;
+	--border: #1d1e23;
+	--hover: #3a3b44;
+	--active: #484a55;
+	--accent: #ffffff;
+	--muted: #a3a5b0;
+	--tile: #ffffff;
 	--badge: #e5332a;
 }
 
@@ -117,6 +118,15 @@ body {
 
 .icon {
 	object-fit: contain;
+}
+
+/* Favicons sit on a light tile so dark or transparent icons stay visible on the dark sidebar */
+img.icon {
+	width: 36px;
+	height: 36px;
+	padding: 6px;
+	border-radius: 9px;
+	background: var(--tile);
 }
 
 .letter {

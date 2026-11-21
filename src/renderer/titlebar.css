@@ -1,8 +1,8 @@
 :root {
-	--bg: #ffffff;
-	--text: #4a4c59;
-	--hover: #f0f0f3;
-	--active: #e4e4ea;
+	--bg: #2b2c33;
+	--text: #d4d5dc;
+	--hover: #3a3b44;
+	--active: #484a55;
 }
 
 * {
