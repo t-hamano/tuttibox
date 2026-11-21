@@ -41,23 +41,16 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             if [[ -z "${!name}" ]]; then
               echo "::error::Missing required repository secret: $name"
               exit 1
             fi
           done
-          if [[ "$APPLE_SIGNING_IDENTITY" != "Developer ID Application: "* ]]; then
-            echo "::error::APPLE_SIGNING_IDENTITY must be a Developer ID Application identity."
-            exit 1
-          fi
-          # electron-builder expects CSC_NAME without the "Developer ID Application: " prefix
-          echo "CSC_NAME=${APPLE_SIGNING_IDENTITY#Developer ID Application: }" >> "$GITHUB_ENV"
 
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
