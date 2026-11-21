@@ -20,8 +20,13 @@ export interface Settings {
 	bounds?: { x: number; y: number; width: number; height: number };
 	maximized?: boolean;
 	activeServiceId?: string;
+	/** Seconds between unread count checks. 0 turns the checks off */
+	pollInterval: number;
 	services: ServiceConfig[];
 }
+
+/** Choices offered in the settings window, in seconds */
+export const POLL_INTERVALS = [ 0, 2, 5, 10, 30, 60 ];
 
 const file = () => join( app.getPath( 'userData' ), 'settings.json' );
 
@@ -34,6 +39,9 @@ export function loadSettings(): Settings {
 	}
 	return {
 		...saved,
+		pollInterval: POLL_INTERVALS.includes( saved.pollInterval as number )
+			? ( saved.pollInterval as number )
+			: 0,
 		// Start with no services; the user adds them from the "+" button
 		services: Array.isArray( saved.services ) ? saved.services : [],
 	};

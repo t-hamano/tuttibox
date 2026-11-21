@@ -12,6 +12,11 @@ export interface ServiceType {
 	 */
 	parseBadge?: ( title: string ) => number;
 	/**
+	 * JavaScript expression run in the page on each check. Its result is passed to `parseBadge`.
+	 * Defaults to the page title.
+	 */
+	pollScript?: string;
+	/**
 	 * Fixed icon URL to use instead of the page's favicon.
 	 * Set this when the service draws the unread count into its favicon,
 	 * so the count is not shown twice next to the sidebar badge.
