@@ -14,36 +14,45 @@ export interface ServiceConfig {
 	badge: boolean;
 	/** JavaScript run after each page load */
 	js: string;
+	/** Seconds between unread count checks. 0 turns the checks off */
+	pollInterval: number;
 }
 
 export interface Settings {
 	bounds?: { x: number; y: number; width: number; height: number };
 	maximized?: boolean;
 	activeServiceId?: string;
-	/** Seconds between unread count checks. 0 turns the checks off */
-	pollInterval: number;
 	services: ServiceConfig[];
 }
 
-/** Choices offered in the settings window, in seconds */
+/** Choices offered in the edit window, in seconds */
 export const POLL_INTERVALS = [ 0, 2, 5, 10, 30, 60 ];
+
+export function normalizePollInterval( value: unknown, fallback = 0 ): number {
+	return POLL_INTERVALS.includes( value as number ) ? ( value as number ) : fallback;
+}
 
 const file = () => join( app.getPath( 'userData' ), 'settings.json' );
 
 export function loadSettings(): Settings {
-	let saved: Partial< Settings > = {};
+	// `pollInterval` was an app-wide setting before it moved to each service
+	let saved: Partial< Settings > & { pollInterval?: number } = {};
 	try {
-		saved = JSON.parse( readFileSync( file(), 'utf8' ) ) as Partial< Settings >;
+		saved = JSON.parse( readFileSync( file(), 'utf8' ) ) as typeof saved;
 	} catch {
 		// First launch
 	}
+	const { pollInterval: appPollInterval, ...rest } = saved;
+	const fallback = normalizePollInterval( appPollInterval );
 	return {
-		...saved,
-		pollInterval: POLL_INTERVALS.includes( saved.pollInterval as number )
-			? ( saved.pollInterval as number )
-			: 0,
+		...rest,
 		// Start with no services; the user adds them from the "+" button
-		services: Array.isArray( saved.services ) ? saved.services : [],
+		services: Array.isArray( saved.services )
+			? saved.services.map( ( service ) => ( {
+					...service,
+					pollInterval: normalizePollInterval( service.pollInterval, fallback ),
+			  } ) )
+			: [],
 	};
 }
 
