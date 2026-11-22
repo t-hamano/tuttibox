@@ -129,25 +129,57 @@ interface TuttiboxApi {
 		}
 	}
 
-	/** Draw the Windows taskbar overlay icon (a number on a red circle) */
+	/**
+	 * Draw the Windows taskbar overlay icon (a number on a red circle).
+	 *
+	 * Windows shows the overlay at 16x16 device-independent pixels, so the
+	 * image is drawn at that size times the display scale. Drawing at a fixed
+	 * size and letting Windows resize it makes the number blurry.
+	 */
 	function drawOverlay( total: number ): string {
-		const size = 32;
+		const scale = Math.max( 1, window.devicePixelRatio || 1 );
+		const size = Math.round( 16 * scale );
 		const canvas = document.createElement( 'canvas' );
 		canvas.width = size;
 		canvas.height = size;
 		const ctx = canvas.getContext( '2d' )!;
-		ctx.fillStyle = '#e5332a';
+		const center = size / 2;
+
+		ctx.fillStyle = '#d93025';
 		ctx.beginPath();
-		ctx.arc( size / 2, size / 2, size / 2, 0, Math.PI * 2 );
+		ctx.arc( center, center, center, 0, Math.PI * 2 );
 		ctx.fill();
+
+		// Make the number as large as the circle allows
 		const text = formatBadge( total );
+		const ratio = { 1: 0.8, 2: 0.66, 3: 0.48 }[ text.length ] ?? 0.48;
 		ctx.fillStyle = '#ffffff';
-		ctx.font = `bold ${ text.length > 2 ? 13 : 18 }px "Segoe UI", sans-serif`;
+		ctx.font = `bold ${ Math.round( size * ratio ) }px "Segoe UI", Arial, sans-serif`;
 		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-		ctx.fillText( text, size / 2, size / 2 + 1 );
+		ctx.textBaseline = 'alphabetic';
+		const metrics = ctx.measureText( text );
+		const maxWidth = size - 4 * scale;
+		const offset = ( metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent ) / 2;
+		ctx.fillText( text, center, center + offset, maxWidth );
 		return canvas.toDataURL( 'image/png' );
 	}
+
+	// Redraw when the window moves to a display with a different scale
+	function watchScale(): void {
+		window
+			.matchMedia( `(resolution: ${ window.devicePixelRatio }dppx)` )
+			.addEventListener(
+				'change',
+				() => {
+					if ( lastTotal > 0 ) {
+						api.setOverlay( drawOverlay( lastTotal ), lastTotal );
+					}
+					watchScale();
+				},
+				{ once: true }
+			);
+	}
+	watchScale();
 
 	api.onState( render );
 } )();
