@@ -67,7 +67,7 @@ export function setupAutoUpdate( onBeforeInstall: () => void ): void {
 	setTimeout( check, FIRST_CHECK_DELAY );
 }
 
-/** "Check for Updates…" menu item */
+/** "Check for Updates" button in the About window */
 export function checkForUpdatesFromMenu(): void {
 	if ( ! app.isPackaged ) {
 		dialog.showMessageBox( {

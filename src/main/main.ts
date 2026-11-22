@@ -68,6 +68,12 @@ export interface AppSettingsData {
 	supportsOpenAtLogin: boolean;
 }
 
+/** Data shown in the About window */
+export interface AboutData {
+	name: string;
+	version: string;
+}
+
 /** Data exchanged with the edit window */
 export interface EditData {
 	name: string;
@@ -113,6 +119,7 @@ const settings = loadSettings();
 /** Edit window webContents.id -> service ID */
 const editWindows = new Map< number, string >();
 let settingsWindow: BrowserWindow | null = null;
+let aboutWindow: BrowserWindow | null = null;
 /** Electron can register the app to launch at login only on macOS and Windows */
 const supportsOpenAtLogin = process.platform === 'darwin' || process.platform === 'win32';
 
@@ -675,6 +682,39 @@ function openSettingsWindow(): void {
 	settingsWindow.loadFile( join( __dirname, '../renderer/settings.html' ) );
 }
 
+function openAboutWindow(): void {
+	if ( ! win ) {
+		return;
+	}
+	if ( aboutWindow ) {
+		aboutWindow.focus();
+		return;
+	}
+	aboutWindow = new BrowserWindow( {
+		parent: win,
+		modal: true,
+		width: 320,
+		height: 260,
+		useContentSize: true,
+		resizable: false,
+		minimizable: false,
+		maximizable: false,
+		title: 'About Tuttibox',
+		show: false,
+		autoHideMenuBar: true,
+		webPreferences: {
+			preload: join( __dirname, '../preload/about.js' ),
+			sandbox: true,
+			contextIsolation: true,
+		},
+	} );
+	aboutWindow.on( 'closed', () => {
+		aboutWindow = null;
+	} );
+	aboutWindow.once( 'ready-to-show', () => aboutWindow?.show() );
+	aboutWindow.loadFile( join( __dirname, '../renderer/about.html' ) );
+}
+
 function getOpenAtLogin(): boolean {
 	return supportsOpenAtLogin && app.getLoginItemSettings().openAtLogin;
 }
@@ -833,6 +873,15 @@ ipcMain.handle( 'settings:set-open-at-login', ( _event, enabled: boolean ): bool
 
 ipcMain.on( 'settings:close', () => settingsWindow?.close() );
 
+ipcMain.handle( 'about:get', (): AboutData => ( {
+	name: app.getName(),
+	version: app.getVersion(),
+} ) );
+
+ipcMain.on( 'about:check-for-updates', () => checkForUpdatesFromMenu() );
+
+ipcMain.on( 'about:close', () => aboutWindow?.close() );
+
 ipcMain.on( 'sidebar:context-menu', ( _event, id: string ) => {
 	const state = findState( id );
 	if ( ! state ) {
@@ -917,7 +966,24 @@ function buildMenu(): void {
 	const activeWebContents = () => ( activeId ? findState( activeId )?.view.webContents : undefined );
 
 	const template: MenuItemConstructorOptions[] = [
-		...( isMac ? [ { role: 'appMenu' } as MenuItemConstructorOptions ] : [] ),
+		...( isMac
+			? [
+				{
+					label: app.getName(),
+					submenu: [
+						{ label: `About ${ app.getName() }`, click: () => openAboutWindow() },
+						{ type: 'separator' },
+						{ role: 'services' },
+						{ type: 'separator' },
+						{ role: 'hide' },
+						{ role: 'hideOthers' },
+						{ role: 'unhide' },
+						{ type: 'separator' },
+						{ role: 'quit' },
+					],
+				} as MenuItemConstructorOptions,
+			]
+			: [] ),
 		{
 			label: 'File',
 			submenu: [
@@ -930,7 +996,8 @@ function buildMenu(): void {
 				{ label: 'Export Settings…', click: () => exportServices() },
 				{ type: 'separator' },
 				{ label: 'Settings…', accelerator: 'CmdOrCtrl+,', click: () => openSettingsWindow() },
-				{ label: 'Check for Updates…', click: () => checkForUpdatesFromMenu() },
+				// On macOS, About lives in the app menu
+				...( isMac ? [] : [ { label: 'About Tuttibox', click: () => openAboutWindow() } as MenuItemConstructorOptions ] ),
 				{ type: 'separator' },
 				isMac ? { role: 'close', label: 'Close Window' } : { label: 'Quit Tuttibox', accelerator: 'Ctrl+Q', click: () => app.quit() },
 			],
