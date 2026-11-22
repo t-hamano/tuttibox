@@ -8,6 +8,7 @@ import {
 	dialog,
 	ipcMain,
 	nativeImage,
+	screen,
 	session,
 	shell,
 	Tray,
@@ -621,6 +622,26 @@ function reorderServices( ids: string[] ): void {
 	persistServices();
 }
 
+/**
+ * Place a dialog in the middle of the main window. Without this, Windows and Linux
+ * open new windows on the primary display, even when the main window is on another one.
+ */
+function centerOnMainWindow( child: BrowserWindow ): void {
+	if ( ! win ) {
+		return;
+	}
+	const parent = win.getBounds();
+	const { width, height } = child.getBounds();
+	const area = screen.getDisplayMatching( parent ).workArea;
+	const x = Math.round( parent.x + ( parent.width - width ) / 2 );
+	const y = Math.round( parent.y + ( parent.height - height ) / 2 );
+	// Keep the dialog fully visible on the display the main window is on
+	child.setPosition(
+		Math.min( Math.max( x, area.x ), area.x + Math.max( 0, area.width - width ) ),
+		Math.min( Math.max( y, area.y ), area.y + Math.max( 0, area.height - height ) )
+	);
+}
+
 function openEditWindow( id: string ): void {
 	const state = findState( id );
 	if ( ! state || ! win ) {
@@ -642,6 +663,7 @@ function openEditWindow( id: string ): void {
 			contextIsolation: true,
 		},
 	} );
+	centerOnMainWindow( editWin );
 	const wcId = editWin.webContents.id;
 	editWindows.set( wcId, id );
 	editWin.on( 'closed', () => editWindows.delete( wcId ) );
@@ -675,6 +697,7 @@ function openSettingsWindow(): void {
 			contextIsolation: true,
 		},
 	} );
+	centerOnMainWindow( settingsWindow );
 	settingsWindow.on( 'closed', () => {
 		settingsWindow = null;
 	} );
@@ -708,6 +731,7 @@ function openAboutWindow(): void {
 			contextIsolation: true,
 		},
 	} );
+	centerOnMainWindow( aboutWindow );
 	aboutWindow.on( 'closed', () => {
 		aboutWindow = null;
 	} );
