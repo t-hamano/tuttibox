@@ -51,37 +51,11 @@ npm run dist:win
 
 Output goes to `release/`. Build each platform on that platform.
 
-## Releases and automatic updates
+## Automatic updates
 
-1. Bump `version` in `package.json` (for example `0.2.0`) and commit it.
-2. Push a matching tag: `git tag v0.2.0 && git push origin v0.2.0`.
-3. GitHub Actions (`.github/workflows/release.yml`) builds macOS and Windows and uploads them to a **draft** release.
-4. Check the draft and publish it. Installed apps only see published releases.
+The app checks for updates 10 seconds after launch (and from File > Check for Updates…), downloads in the background and asks to restart. If you pick "Later", the update is installed on the next quit.
 
-- macOS: signed with Developer ID Application and notarized. Universal (Intel / Apple Silicon). The `.zip` is what the updater downloads; the `.dmg` is for first installs.
-- Windows: not signed (x64 / arm64). SmartScreen warns on the first install; updates install without a prompt.
-
-The app checks for updates 10 seconds after launch (and from File > Check for Updates…), downloads in the background and asks to restart. If the user picks "Later", the update is installed on the next quit. Updates need the repository to be public, since the app reads GitHub Releases without a token. Development builds (`npm start`) never check.
-
-Required repository secrets:
-
-| Secret | Value |
-|---|---|
-| `APPLE_CERTIFICATE` | Developer ID Application certificate (.p12), base64 encoded |
-| `APPLE_CERTIFICATE_PASSWORD` | Password of the .p12 |
-| `APPLE_ID` | Apple ID email address |
-| `APPLE_PASSWORD` | App-specific password for the Apple ID |
-| `APPLE_TEAM_ID` | Team ID |
-
-To make a signed build on a local Mac with the certificate in the keychain:
-
-```bash
-APPLE_ID=... APPLE_APP_SPECIFIC_PASSWORD=... APPLE_TEAM_ID=... npm run dist:mac
-```
-
-## App icon
-
-The source is `build/icon.svg` (macOS, with the standard padding) and `build/icon-win.svg` (Windows, full bleed). `build/icon.png` and `build/icon-win.png` are 1024px exports used by electron-builder.
+On Windows the app is not signed, so SmartScreen warns on the first install. Updates install without a prompt.
 
 ## Custom JavaScript
 
