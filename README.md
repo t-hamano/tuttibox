@@ -34,19 +34,21 @@ Apps are defined in `src/main/services.ts`.
 
 ## Development
 
+This project uses [pnpm](https://pnpm.io/installation).
+
 ```bash
-npm install
-npm start
+pnpm install
+pnpm start
 ```
 
 ## Building installers
 
 ```bash
-npm run dist:mac
+pnpm run dist:mac
 ```
 
 ```bash
-npm run dist:win
+pnpm run dist:win
 ```
 
 Output goes to `release/`. Build each platform on that platform.
