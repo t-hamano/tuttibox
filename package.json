@@ -1,7 +1,7 @@
 {
   "name": "tuttibox",
   "productName": "Tuttibox",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A lightweight desktop app that brings your web apps into one window",
   "main": "dist/main/main.js",
   "private": true,
