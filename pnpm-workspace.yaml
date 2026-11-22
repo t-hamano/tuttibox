@@ -1,0 +1,6 @@
+# electron-builder expects a flat node_modules layout when it packs the app
+nodeLinker: hoisted
+
+allowBuilds:
+  esbuild: true
+  electron-winstaller: false
