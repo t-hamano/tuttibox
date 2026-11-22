@@ -145,14 +145,9 @@ interface TuttiboxApi {
 		const ctx = canvas.getContext( '2d' )!;
 		const center = size / 2;
 
-		// A white ring separates the badge from the app icon underneath
-		ctx.fillStyle = '#ffffff';
-		ctx.beginPath();
-		ctx.arc( center, center, center, 0, Math.PI * 2 );
-		ctx.fill();
 		ctx.fillStyle = '#d93025';
 		ctx.beginPath();
-		ctx.arc( center, center, center - Math.max( 1, scale ), 0, Math.PI * 2 );
+		ctx.arc( center, center, center, 0, Math.PI * 2 );
 		ctx.fill();
 
 		// Make the number as large as the circle allows
