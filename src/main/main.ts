@@ -234,6 +234,9 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 			sandbox: true,
 			contextIsolation: true,
 			spellcheck: false,
+			// Hidden pages are throttled by default, which delays new message checks
+			// (and so unread counts) by up to a minute
+			backgroundThrottling: false,
 		},
 	} );
 	// Size the view before hiding it. A view hidden before it has a size loads its page
