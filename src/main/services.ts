@@ -50,14 +50,37 @@ const slackMentionScript = `( () => {
 		.reduce( ( sum, badge ) => sum + count( badge ), 0 );
 } )()`;
 
+/**
+ * Read Gmail's inbox unread count from the "Inbox" link in the side menu.
+ * The page title only has the count while the inbox list is shown. It is replaced by
+ * the subject while an email is open, so the title alone often misses new messages.
+ * Falls back to the title when the side menu is not available.
+ */
+const gmailUnreadScript = `( () => {
+	const inbox = document.querySelector( 'a[href$="#inbox"]' );
+	if ( inbox ) {
+		// Climb to the Inbox row, stopping before a parent that holds other menu items
+		let row = inbox;
+		while ( row.parentElement && row.parentElement.querySelectorAll( 'a[href*="#"]' ).length === 1 ) {
+			row = row.parentElement;
+		}
+		const count = row.querySelector( '.bsU' );
+		return count ? parseInt( count.textContent.replace( /[^0-9]/g, '' ), 10 ) || 0 : 0;
+	}
+	const match = document.title.match( /\\((\\d+)\\)/ );
+	return match ? Number( match[ 1 ] ) : 0;
+} )()`;
+
 export const serviceTypes: ServiceType[] = [
 	{
 		type: 'gmail',
 		label: 'Gmail',
 		url: 'https://mail.google.com/mail/',
 		color: '#ea4335',
-		// e.g. "Inbox (3) - user@gmail.com - Gmail"
-		parseBadge: countInParentheses,
+		pollScript: gmailUnreadScript,
+		parseBadge: ( result ) => Number( result ) || 0,
+		// The count can change while an email is open, without the title changing
+		defaultPollInterval: 5,
 		// Gmail's favicon includes the unread count, so use the plain icon instead
 		icon: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico',
 	},
