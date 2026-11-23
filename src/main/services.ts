@@ -57,14 +57,11 @@ const slackMentionScript = `( () => {
  * Falls back to the title when the side menu is not available.
  */
 const gmailUnreadScript = `( () => {
-	const inbox = document.querySelector( 'a[href$="#inbox"]' );
+	// The Gmail logo also links to "#inbox", so match the menu item's full URL
+	const inbox = document.querySelector( 'a[href$="/#inbox"]' );
 	if ( inbox ) {
-		// Climb to the Inbox row, stopping before a parent that holds other menu items
-		let row = inbox;
-		while ( row.parentElement && row.parentElement.querySelectorAll( 'a[href*="#"]' ).length === 1 ) {
-			row = row.parentElement;
-		}
-		const count = row.querySelector( '.bsU' );
+		// The count sits next to the link and is removed when there are no unread emails
+		const count = inbox.closest( '.TO' )?.querySelector( '.bsU' );
 		return count ? parseInt( count.textContent.replace( /[^0-9]/g, '' ), 10 ) || 0 : 0;
 	}
 	const match = document.title.match( /\\((\\d+)\\)/ );
