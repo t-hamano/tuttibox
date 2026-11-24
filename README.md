@@ -16,6 +16,7 @@ A lightweight desktop app for Windows and macOS that brings your web apps into o
 - Desktop notifications from services are suppressed; unread counts are shown only as badges
 - Export / import the added apps, their settings and their order from the File menu (login sessions are not included)
 - Settings window (gear button under the add button, or File > Settings…) with a "Launch at login" toggle (macOS / Windows)
+- Slack links opened in the browser open in Tuttibox's Slack when Slack's desktop app is not installed
 - Automatic updates from GitHub Releases (macOS / Windows), plus File > Check for Updates…
 
 ## Supported apps
@@ -77,6 +78,7 @@ The unread count is read from a `(number)` in the page title. Apps that do not s
 src/
   main/
     main.ts       Window and view management, adding/removing/reordering services, badges, menus
+    slack-links.ts  Opens slack:// links (from Slack pages in the browser) in the Slack service
     services.ts   Service types that can be added (URL, how to read the unread count)
     settings.ts   Persists the service list, window position, etc.
     transfer.ts   Reads and writes the export file for File > Import / Export Settings
