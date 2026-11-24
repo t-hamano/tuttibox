@@ -27,6 +27,14 @@ import {
 	saveSettings,
 	type ServiceConfig,
 } from './settings';
+import {
+	findSlackUrl,
+	openInSlackApp,
+	parseSlackUrl,
+	registerSlackProtocol,
+	slackWebUrl,
+	teamOfSlackWebUrl,
+} from './slack-links';
 import { parseServices, serializeServices } from './transfer';
 import { checkForUpdatesFromMenu, setupAutoUpdate } from './updater';
 
@@ -746,6 +754,36 @@ function getOpenAtLogin(): boolean {
 	return supportsOpenAtLogin && app.getLoginItemSettings().openAtLogin;
 }
 
+/** slack:// link received before the window and services were ready */
+let pendingSlackUrl: string | undefined = findSlackUrl( process.argv );
+
+async function handleSlackUrl( url: string ): Promise< void > {
+	if ( ! app.isReady() ) {
+		pendingSlackUrl = url;
+		return;
+	}
+	if ( await openInSlackApp( url ) ) {
+		return;
+	}
+	showWindow();
+	const link = parseSlackUrl( url );
+	const slackStates = states.filter( ( state ) => state.config.type === 'slack' );
+	if ( ! link || slackStates.length === 0 ) {
+		return;
+	}
+	// With several Slack services, prefer the one signed in to the linked workspace
+	const target =
+		slackStates.find( ( state ) => link.team && teamOfSlackWebUrl( state.view.webContents.getURL() ) === link.team ) ??
+		slackStates.find( ( state ) => state.config.id === activeId ) ??
+		slackStates[ 0 ];
+	activate( target.config.id );
+	const wc = target.view.webContents;
+	const webUrl = slackWebUrl( link, teamOfSlackWebUrl( wc.getURL() ) );
+	if ( webUrl ) {
+		wc.loadURL( webUrl );
+	}
+}
+
 function showWindow(): void {
 	if ( ! win ) {
 		createWindow();
@@ -1087,7 +1125,19 @@ ipcMain.on( 'titlebar:open-menu', ( event, index: number, x: number, y: number )
 	} );
 } );
 
-app.on( 'second-instance', showWindow );
+app.on( 'second-instance', ( _event, argv ) => {
+	const slackUrl = findSlackUrl( argv );
+	if ( slackUrl ) {
+		void handleSlackUrl( slackUrl );
+	} else {
+		showWindow();
+	}
+} );
+// macOS delivers slack:// links here, also the one the app was launched with
+app.on( 'open-url', ( event, url ) => {
+	event.preventDefault();
+	void handleSlackUrl( url );
+} );
 app.on( 'activate', showWindow );
 app.on( 'before-quit', () => {
 	quitting = true;
@@ -1111,6 +1161,11 @@ app.whenReady().then( () => {
 	createWindow();
 	buildMenu();
 	createTray();
+	registerSlackProtocol();
+	if ( pendingSlackUrl ) {
+		void handleSlackUrl( pendingSlackUrl );
+		pendingSlackUrl = undefined;
+	}
 	setupAutoUpdate( () => {
 		// The window would otherwise hide itself instead of closing and block the install
 		quitting = true;
