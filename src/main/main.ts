@@ -771,17 +771,56 @@ async function handleSlackUrl( url: string ): Promise< void > {
 	if ( ! link || slackStates.length === 0 ) {
 		return;
 	}
-	// With several Slack services, prefer the one signed in to the linked workspace
+	// With several Slack services, prefer the one signed in to the linked workspace.
+	// Right after launch the services have not shown their workspace yet, so wait for that
+	const teamOf = ( state: ServiceState ) => teamOfSlackWebUrl( state.view.webContents.getURL() );
+	if ( link.team && slackStates.length > 1 ) {
+		await waitForSlackTeams( slackStates, link.team );
+	}
 	const target =
-		slackStates.find( ( state ) => link.team && teamOfSlackWebUrl( state.view.webContents.getURL() ) === link.team ) ??
+		slackStates.find( ( state ) => link.team && teamOf( state ) === link.team ) ??
 		slackStates.find( ( state ) => state.config.id === activeId ) ??
 		slackStates[ 0 ];
 	activate( target.config.id );
 	const wc = target.view.webContents;
-	const webUrl = slackWebUrl( link, teamOfSlackWebUrl( wc.getURL() ) );
+	const webUrl = slackWebUrl( link, teamOf( target ) );
 	if ( webUrl ) {
 		wc.loadURL( webUrl );
 	}
+}
+
+/**
+ * Resolve once a service shows the given workspace, every service shows some workspace,
+ * or after a timeout (e.g. a service that is not signed in never shows one).
+ */
+function waitForSlackTeams( slackStates: ServiceState[], team: string ): Promise< void > {
+	const teamOf = ( state: ServiceState ) => teamOfSlackWebUrl( state.view.webContents.getURL() );
+	const ready = () =>
+		slackStates.some( ( state ) => teamOf( state ) === team ) ||
+		slackStates.every( ( state ) => teamOf( state ) );
+	if ( ready() ) {
+		return Promise.resolve();
+	}
+	return new Promise( ( done ) => {
+		const finish = () => {
+			clearTimeout( timer );
+			for ( const state of slackStates ) {
+				if ( ! state.view.webContents.isDestroyed() ) {
+					state.view.webContents.off( 'did-navigate', check ).off( 'did-navigate-in-page', check );
+				}
+			}
+			done();
+		};
+		const check = () => {
+			if ( ready() ) {
+				finish();
+			}
+		};
+		const timer = setTimeout( finish, 15_000 );
+		for ( const state of slackStates ) {
+			state.view.webContents.on( 'did-navigate', check ).on( 'did-navigate-in-page', check );
+		}
+	} );
 }
 
 function showWindow(): void {
