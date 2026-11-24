@@ -767,15 +767,20 @@ async function handleSlackUrl( url: string ): Promise< void > {
 	}
 	showWindow();
 	const link = parseSlackUrl( url );
-	const slackStates = states.filter( ( state ) => state.config.type === 'slack' );
+	const findSlackStates = () => states.filter( ( state ) => state.config.type === 'slack' );
+	let slackStates = findSlackStates();
 	if ( ! link || slackStates.length === 0 ) {
 		return;
 	}
 	// With several Slack services, prefer the one signed in to the linked workspace.
 	// Right after launch the services have not shown their workspace yet, so wait for that
-	const teamOf = ( state: ServiceState ) => teamOfSlackWebUrl( state.view.webContents.getURL() );
 	if ( link.team && slackStates.length > 1 ) {
 		await waitForSlackTeams( slackStates, link.team );
+		// Services may have been removed while waiting
+		slackStates = findSlackStates();
+		if ( slackStates.length === 0 ) {
+			return;
+		}
 	}
 	const target =
 		slackStates.find( ( state ) => link.team && teamOf( state ) === link.team ) ??
@@ -789,15 +794,22 @@ async function handleSlackUrl( url: string ): Promise< void > {
 	}
 }
 
+/** Team ID of the workspace a Slack service shows */
+function teamOf( state: ServiceState ): string | undefined {
+	const wc = state.view.webContents;
+	return wc.isDestroyed() ? undefined : teamOfSlackWebUrl( wc.getURL() );
+}
+
 /**
  * Resolve once a service shows the given workspace, every service shows some workspace,
  * or after a timeout (e.g. a service that is not signed in never shows one).
  */
 function waitForSlackTeams( slackStates: ServiceState[], team: string ): Promise< void > {
-	const teamOf = ( state: ServiceState ) => teamOfSlackWebUrl( state.view.webContents.getURL() );
-	const ready = () =>
-		slackStates.some( ( state ) => teamOf( state ) === team ) ||
-		slackStates.every( ( state ) => teamOf( state ) );
+	const ready = () => {
+		// Removed services no longer count
+		const alive = slackStates.filter( ( state ) => ! state.view.webContents.isDestroyed() );
+		return alive.some( ( state ) => teamOf( state ) === team ) || alive.every( ( state ) => teamOf( state ) );
+	};
 	if ( ready() ) {
 		return Promise.resolve();
 	}
