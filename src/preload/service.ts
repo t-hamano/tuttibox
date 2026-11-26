@@ -55,6 +55,50 @@ contextBridge.executeInMainWorld( {
 } );
 
 /**
+ * Hidden service views draw no frames, so `requestAnimationFrame` callbacks never run there.
+ * Some services (e.g. Slack) wait for the next frame to update the page, so their unread
+ * badges stayed stale until the service was shown. When no frame comes within a second,
+ * run the callback from a timer instead. Shown pages get their frames first, as usual.
+ */
+contextBridge.executeInMainWorld( {
+	func: () => {
+		const FALLBACK_DELAY = 1000;
+		const nativeRequest = window.requestAnimationFrame.bind( window );
+		const nativeCancel = window.cancelAnimationFrame.bind( window );
+		const pending = new Map< number, { frame: number; timer: ReturnType< typeof setTimeout > } >();
+		let nextId = 1;
+
+		window.requestAnimationFrame = ( callback: FrameRequestCallback ): number => {
+			const id = nextId++;
+			const run = ( time: number ) => {
+				const entry = pending.get( id );
+				if ( ! entry ) {
+					return;
+				}
+				pending.delete( id );
+				nativeCancel( entry.frame );
+				clearTimeout( entry.timer );
+				callback( time );
+			};
+			pending.set( id, {
+				frame: nativeRequest( run ),
+				timer: setTimeout( () => run( performance.now() ), FALLBACK_DELAY ),
+			} );
+			return id;
+		};
+
+		window.cancelAnimationFrame = ( id: number ): void => {
+			const entry = pending.get( id );
+			if ( entry ) {
+				pending.delete( id );
+				nativeCancel( entry.frame );
+				clearTimeout( entry.timer );
+			}
+		};
+	},
+} );
+
+/**
  * Google sign-in blocks embedded Chromium, so on the sign-in host present the page as Firefox.
  * The main process rewrites the request headers to match.
  */
