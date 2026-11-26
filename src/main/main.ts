@@ -273,9 +273,6 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 	const state: ServiceState = { config, type, view, unread: 0, icon: type.icon, failed: false };
 	states.push( state );
 	startPolling( state );
-	if ( type.icon ) {
-		void saveIcon( state, type.icon );
-	}
 
 	const wc = view.webContents;
 	handleSignInUserAgent( wc );
@@ -368,7 +365,13 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 	} );
 
 	// `did-navigate` is only emitted for pages that loaded, not for error pages
-	wc.on( 'did-navigate', () => setFailed( state, false ) );
+	wc.on( 'did-navigate', () => {
+		setFailed( state, false );
+		// A fixed icon is saved once the page loads, which also covers starting offline
+		if ( type.icon && ! config.icon ) {
+			void saveIcon( state, type.icon );
+		}
+	} );
 
 	wc.on( 'render-process-gone', () => {
 		if ( ! wc.isDestroyed() ) {
