@@ -2,6 +2,7 @@
 	--text: #1c1d2e;
 	--muted: #6b6d7a;
 	--primary: #1c1d2e;
+	--border: #d9d9de;
 }
 
 * {
@@ -43,14 +44,25 @@ h1 {
 	display: block;
 }
 
+.actions {
+	display: flex;
+	gap: 8px;
+}
+
 button {
 	padding: 7px 16px;
-	border: 1px solid var(--primary);
+	border: 1px solid var(--border);
 	border-radius: 6px;
-	background: var(--primary);
-	color: #fff;
+	background: #fff;
+	color: var(--text);
 	font: inherit;
 	cursor: pointer;
+}
+
+button.primary {
+	border-color: var(--primary);
+	background: var(--primary);
+	color: #fff;
 }
 
 button:focus-visible {

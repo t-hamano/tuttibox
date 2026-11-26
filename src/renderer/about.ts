@@ -18,6 +18,7 @@ interface AboutApi {
 	document.getElementById( 'version' )!.textContent = data.version;
 
 	button.addEventListener( 'click', () => api.checkForUpdates() );
+	document.getElementById( 'close' )!.addEventListener( 'click', () => api.close() );
 	document.addEventListener( 'keydown', ( event ) => {
 		if ( event.key === 'Escape' ) {
 			api.close();
