@@ -107,23 +107,29 @@ h1 {
 	cursor: default;
 }
 
-.actions {
+.close {
+	position: absolute;
+	top: 16px;
+	right: 14px;
 	display: flex;
-	justify-content: flex-end;
-	margin-top: auto;
-}
-
-button {
-	padding: 7px 16px;
-	border: 1px solid var(--border);
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
 	border-radius: 6px;
-	background: #fff;
-	font: inherit;
+	background: transparent;
+	color: var(--muted);
 	cursor: pointer;
 }
 
-button.primary {
-	border-color: var(--primary);
-	background: var(--primary);
-	color: #fff;
+.close:hover {
+	background: #f0f0f3;
+	color: var(--text);
+}
+
+.close:focus-visible {
+	outline: 2px solid var(--primary);
+	outline-offset: 0;
 }
