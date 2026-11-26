@@ -8,6 +8,7 @@ import {
 	dialog,
 	ipcMain,
 	nativeImage,
+	nativeTheme,
 	screen,
 	session,
 	shell,
@@ -241,6 +242,44 @@ function createWindow(): void {
 		win = null;
 	} );
 	layout();
+}
+
+/**
+ * Windows resets the title bar overlay and leaves our own views partly drawn with
+ * high contrast colors (e.g. a white title bar) after high contrast mode is turned off.
+ * When the mode changes, apply the overlay and background colors again and reload
+ * the app's own views so they are drawn from scratch. Service pages are left alone.
+ */
+function watchHighContrast(): void {
+	let highContrast = nativeTheme.shouldUseHighContrastColors;
+	nativeTheme.on( 'updated', () => {
+		if ( nativeTheme.shouldUseHighContrastColors === highContrast ) {
+			return;
+		}
+		highContrast = nativeTheme.shouldUseHighContrastColors;
+		if ( ! win || win.isDestroyed() ) {
+			return;
+		}
+		win.setBackgroundColor( BORDER_COLOR );
+		if ( ! isMac ) {
+			win.setTitleBarOverlay( {
+				color: TITLEBAR_COLOR,
+				symbolColor: TITLEBAR_SYMBOL_COLOR,
+				height: TITLEBAR_HEIGHT,
+			} );
+		}
+		for ( const view of [ titlebar, sidebar, emptyView, offlineView ] ) {
+			if ( view && ! view.webContents.isDestroyed() ) {
+				view.webContents.reload();
+			}
+		}
+		for ( const window of [ settingsWindow, aboutWindow ] ) {
+			if ( window && ! window.isDestroyed() ) {
+				window.webContents.reload();
+			}
+		}
+		layout();
+	} );
 }
 
 function createServiceView( config: ServiceConfig ): ServiceState | undefined {
@@ -1287,6 +1326,7 @@ app.whenReady().then( () => {
 		app.setAppUserModelId( app.isPackaged ? 'com.t-hamano.tuttibox' : 'com.t-hamano.tuttibox.dev' );
 	}
 	createWindow();
+	watchHighContrast();
 	buildMenu();
 	createTray();
 	registerSlackProtocol();
