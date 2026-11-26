@@ -31,5 +31,4 @@ interface SettingsApi {
 			api.close();
 		}
 	} );
-	closeButton.focus();
 } )();
