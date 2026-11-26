@@ -57,7 +57,10 @@ interface ServiceState {
 	view: WebContentsView;
 	/** Unread count read from the title (kept even when the badge is disabled) */
 	unread: number;
+	/** URL of the current icon. The sidebar shows `config.icon`, its saved copy, when there is one */
 	icon?: string;
+	/** The page failed to load (e.g. offline), so the offline notice is shown instead */
+	failed: boolean;
 	pollTimer?: ReturnType< typeof setInterval >;
 }
 
@@ -118,6 +121,8 @@ let sidebar: WebContentsView;
 let titlebar: WebContentsView | null = null;
 /** Shown in the content area while no services have been added */
 let emptyView: WebContentsView;
+/** Shown in place of a service whose page failed to load (e.g. offline) */
+let offlineView: WebContentsView;
 /** In sidebar order */
 const states: ServiceState[] = [];
 let activeId: string | undefined;
@@ -191,6 +196,17 @@ function createWindow(): void {
 	win.contentView.addChildView( emptyView );
 	emptyView.webContents.loadFile( join( __dirname, '../renderer/empty.html' ) );
 
+	offlineView = new WebContentsView( {
+		webPreferences: {
+			preload: join( __dirname, '../preload/offline.js' ),
+			sandbox: true,
+			contextIsolation: true,
+		},
+	} );
+	offlineView.setVisible( false );
+	win.contentView.addChildView( offlineView );
+	offlineView.webContents.loadFile( join( __dirname, '../renderer/offline.html' ) );
+
 	for ( const config of settings.services ) {
 		createServiceView( config );
 	}
@@ -254,9 +270,12 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 	view.setVisible( false );
 	win!.contentView.addChildView( view );
 
-	const state: ServiceState = { config, type, view, unread: 0, icon: type.icon };
+	const state: ServiceState = { config, type, view, unread: 0, icon: type.icon, failed: false };
 	states.push( state );
 	startPolling( state );
+	if ( type.icon ) {
+		void saveIcon( state, type.icon );
+	}
 
 	const wc = view.webContents;
 	handleSignInUserAgent( wc );
@@ -290,6 +309,7 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		if ( favicons[ 0 ] && favicons[ 0 ] !== state.icon ) {
 			state.icon = favicons[ 0 ];
 			pushSidebarState();
+			void saveIcon( state, favicons[ 0 ] );
 		}
 	} );
 
@@ -333,10 +353,12 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 		Menu.buildFromTemplate( template ).popup();
 	} );
 
-	// Retry after a short delay when loading fails (e.g. offline)
+	// Show the offline notice and retry after a short delay when loading fails (e.g. offline).
+	// The notice also retries as soon as the connection comes back (see renderer/offline.ts)
 	wc.on( 'did-fail-load', ( _event, errorCode, _desc, _url, isMainFrame ) => {
 		// -3 is ERR_ABORTED (cancelled by the user)
 		if ( isMainFrame && errorCode !== -3 ) {
+			setFailed( state, true );
 			setTimeout( () => {
 				if ( ! wc.isDestroyed() ) {
 					wc.reload();
@@ -344,6 +366,9 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 			}, 10_000 );
 		}
 	} );
+
+	// `did-navigate` is only emitted for pages that loaded, not for error pages
+	wc.on( 'did-navigate', () => setFailed( state, false ) );
 
 	wc.on( 'render-process-gone', () => {
 		if ( ! wc.isDestroyed() ) {
@@ -353,6 +378,44 @@ function createServiceView( config: ServiceConfig ): ServiceState | undefined {
 
 	wc.loadURL( type.url );
 	return state;
+}
+
+function setFailed( state: ServiceState, failed: boolean ): void {
+	if ( state.failed !== failed ) {
+		state.failed = failed;
+		updateContentViews();
+	}
+}
+
+/** Reload the services whose page failed to load */
+function retryFailed(): void {
+	for ( const state of states ) {
+		if ( state.failed && ! state.view.webContents.isDestroyed() ) {
+			state.view.webContents.reload();
+		}
+	}
+}
+
+/** Save the icon as a data URL so the sidebar can still show it while offline */
+async function saveIcon( state: ServiceState, url: string ): Promise< void > {
+	try {
+		const response = await state.view.webContents.session.fetch( url );
+		const contentType = response.headers.get( 'content-type' ) ?? '';
+		if ( ! response.ok || ! contentType.startsWith( 'image/' ) ) {
+			return;
+		}
+		const data = Buffer.from( await response.arrayBuffer() ).toString( 'base64' );
+		const dataUrl = `data:${ contentType };base64,${ data }`;
+		// Skip if the service was removed or the icon changed meanwhile
+		if ( ! states.includes( state ) || state.icon !== url || state.config.icon === dataUrl ) {
+			return;
+		}
+		state.config.icon = dataUrl;
+		saveSettings( settings );
+		pushSidebarState();
+	} catch {
+		// Offline: keep the saved icon
+	}
 }
 
 function runCustomJs( state: ServiceState ): void {
@@ -447,6 +510,7 @@ function layout(): void {
 	const contentBounds = getContentBounds();
 	sidebar.setBounds( { x: 0, y: contentBounds.y, width: SIDEBAR_WIDTH, height: contentBounds.height } );
 	emptyView.setBounds( contentBounds );
+	offlineView.setBounds( contentBounds );
 	for ( const { view } of states ) {
 		view.setBounds( contentBounds );
 	}
@@ -454,6 +518,16 @@ function layout(): void {
 
 function updateEmptyState(): void {
 	emptyView?.setVisible( states.length === 0 );
+	updateContentViews();
+}
+
+/** Show the active service, or the offline notice in its place when its page failed to load */
+function updateContentViews(): void {
+	const active = activeId ? findState( activeId ) : undefined;
+	for ( const state of states ) {
+		state.view.setVisible( state === active && ! state.failed );
+	}
+	offlineView?.setVisible( !! active?.failed );
 }
 
 function findState( id: string ): ServiceState | undefined {
@@ -466,9 +540,7 @@ function activate( id: string ): void {
 		return;
 	}
 	activeId = id;
-	for ( const state of states ) {
-		state.view.setVisible( state === target );
-	}
+	updateContentViews();
 	target.view.webContents.focus();
 	settings.activeServiceId = id;
 	saveSettings( settings );
@@ -937,7 +1009,7 @@ function pushSidebarState(): void {
 		id: state.config.id,
 		name: state.config.name,
 		color: state.type.color,
-		icon: state.icon,
+		icon: state.config.icon ?? state.icon,
 		badge: badgeOf( state ),
 		active: state.config.id === activeId,
 	} ) );
@@ -961,6 +1033,8 @@ ipcMain.on( 'sidebar:select', ( _event, id: string ) => {
 		void pollService( state );
 	}
 } );
+
+ipcMain.on( 'offline:retry', retryFailed );
 
 ipcMain.on( 'sidebar:reorder', ( _event, ids: string[] ) => reorderServices( ids ) );
 
