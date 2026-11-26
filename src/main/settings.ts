@@ -16,6 +16,8 @@ export interface ServiceConfig {
 	js: string;
 	/** Seconds between unread count checks. 0 turns the checks off */
 	pollInterval: number;
+	/** Last loaded icon as a data URL, so the sidebar can show it while offline */
+	icon?: string;
 }
 
 export interface Settings {
